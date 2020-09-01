@@ -91,11 +91,13 @@ public:
 
         m_emulation_id = 0;
         m_next_cert_index = 1;
-        m_max_cert_index = 50000;
+        m_max_cert_index = 1;
         
         try
         {
             m_emulation_id = jcfg["emulation_id"].get<int>();
+            m_next_cert_index = jcfg["begin_cert_index"].get<int>();
+            m_max_cert_index = jcfg["end_cert_index"].get<int>();
         }
         catch(const std::exception& e)
         {
