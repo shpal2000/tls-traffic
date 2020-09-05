@@ -33,42 +33,10 @@ static void dump_stats (const char* out_file, app_stats* stats)
     stats_stream << j << std::endl;
 }
 
-static void host_cmd(const char* next_cmd_descp, const char* next_cmd)
-{
-    char cmd_buff[2048];
-    char ssh_host_file [512];
-
-    sprintf (ssh_host_file, "%ssys/host", RUN_DIR_PATH);
-    std::ifstream ssh_host_stream(ssh_host_file);
-    json ssh_host_json = json::parse(ssh_host_stream);
-    auto ssh_host = ssh_host_json["host"].get<std::string>();
-    auto ssh_user = ssh_host_json["user"].get<std::string>();
-    auto ssh_pass = ssh_host_json["pass"].get<std::string>();
-
-    sprintf (cmd_buff,
-            "ssh -i %ssys/id_rsa -tt "
-            // "-o LogLevel=quiet "
-            "-o StrictHostKeyChecking=no "
-            "-o UserKnownHostsFile=/dev/null "
-            "%s@%s "
-            "%s",
-            RUN_DIR_PATH,
-            ssh_user.c_str(), ssh_host.c_str(),
-            next_cmd);
-    system_cmd (next_cmd_descp, cmd_buff);
-}
-
 static void config_zone (json cfg_json
                             , int z_index)
 {
-    auto host_cmds = cfg_json["zones"][z_index]["host_cmds"];
     auto zone_cmds = cfg_json["zones"][z_index]["zone_cmds"];
-
-    //run all host commands
-    for (auto cmd_it = host_cmds.begin(); cmd_it != host_cmds.end(); ++cmd_it) {
-        auto cmd = cmd_it.value().get<std::string>();
-        host_cmd ("host_cmd", cmd.c_str());
-    }
 
     //run all zone commands
     for (auto cmd_it = zone_cmds.begin(); cmd_it != zone_cmds.end(); ++cmd_it) {
