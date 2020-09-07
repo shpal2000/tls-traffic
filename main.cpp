@@ -9,8 +9,6 @@
 #include "./tls_client/tls_client.hpp"
 #include "./tcp_proxy/tcp_proxy.hpp"
 
-#define RUN_DIR_PATH "/rundir/"
-
 app_stats* zone_ev_sockstats = nullptr;
 tls_server_stats* zone_tls_server_stats = nullptr;
 tls_client_stats* zone_tls_client_stats = nullptr;
@@ -127,35 +125,17 @@ static std::vector<app*>* create_app_list (json cfg_json, int z_index)
 
 int main(int /*argc*/, char **argv) 
 {
-    char cfg_dir [512]; // not needed
-    char cfg_file [1024]; //make it cmd args
-    char result_dir [1024]; //make it cmd args
+    char stats_file [4096];
 
-    char stats_file [1024];
-
-    char* mode = argv[1];
-    char* cfg_name = argv[2];
-
-    sprintf (cfg_dir, "%straffic/%s/", RUN_DIR_PATH, cfg_name);
-    sprintf (cfg_file, "%s%s", cfg_dir, "config.json");
+    char* result_dir = argv[1];
+    char* started_file = argv[2];
+    char* cfg_file = argv[3];
+    int z_index = atoi (argv[4]);
 
     std::ifstream cfg_stream(cfg_file);
     json cfg_json = json::parse(cfg_stream);
-
-    char* run_tag = argv[3];
-    int z_index = atoi (argv[4]);
-    char* config_zone_flag = argv[5];
-    
-    auto zone_label 
-        = cfg_json["zones"][z_index]["zone_label"].get<std::string>();
-
-    sprintf (result_dir, "%straffic/%s/%s/%s/", RUN_DIR_PATH, cfg_name
-                                                , "results", run_tag);
-    
-    if ( strcmp(config_zone_flag, "config_zone") == 0 )
-    {
-        config_zone (cfg_json, z_index);
-    }
+        
+    config_zone (cfg_json, z_index);
 
     signal(SIGPIPE, SIG_IGN);
 
@@ -166,6 +146,9 @@ int main(int /*argc*/, char **argv)
 
     if ( app_list )
     {
+        std::ofstream started_file_stream(started_file);
+        started_file_stream << "started" << std::endl;
+
         std::chrono::time_point<std::chrono::system_clock> start, end;
         start = std::chrono::system_clock::now();
         int tick_5sec = 0;
@@ -201,36 +184,27 @@ int main(int /*argc*/, char **argv)
             {
                 tick_5sec = 0;
 
-                sprintf (stats_file,
-                        "%s%s/"
-                        "ev_sockstats.json",
-                        result_dir, zone_label.c_str());
+                sprintf (stats_file, "%s/ev_sockstats.json", result_dir);
                 dump_stats (stats_file, zone_ev_sockstats);
 
                 if (zone_tls_server_stats)
                 {
-                    sprintf (stats_file,
-                            "%s%s/"
-                            "tls_server_stats.json",
-                            result_dir, zone_label.c_str());
+                    sprintf (stats_file, "%s/tls_server_stats.json", result_dir);
                     dump_stats (stats_file, zone_tls_server_stats);
                 }
 
                 if (zone_tls_client_stats)
                 {
-                    sprintf (stats_file,
-                            "%s%s/"
-                            "tls_client_stats.json",
-                            result_dir, zone_label.c_str());
+                    sprintf (stats_file, "%s/tls_client_stats.json", result_dir);
                     dump_stats (stats_file, zone_tls_client_stats);
                 }
 
                 for (app* app_ptr : *app_list)
                 {
                     sprintf (stats_file,
-                        "%s%s/"
+                        "%s/"
                         "%s/%s_stats.json",
-                        result_dir, zone_label.c_str(),
+                        result_dir,
                         app_ptr->get_app_label(), app_ptr->get_app_type());
                     dump_stats (stats_file
                                 , (app_stats*)app_ptr->get_app_stats());
@@ -241,10 +215,10 @@ int main(int /*argc*/, char **argv)
                             it!=app_stats_map->end(); ++it)
                     {
                         sprintf (stats_file,
-                        "%s%s/"
+                        "%s/"
                         "%s/%s/"
                         "%s_stats.json",
-                        result_dir, zone_label.c_str(),
+                        result_dir,
                         app_ptr->get_app_label(), it->first.c_str(),
                         app_ptr->get_app_type());
                         dump_stats (stats_file, (app_stats*)it->second);  
@@ -261,6 +235,9 @@ int main(int /*argc*/, char **argv)
     else
     {
         printf ("no apps!\n");
+
+        std::ofstream started_file_stream(started_file);
+        started_file_stream << "no apps!" << std::endl;
         exit (-1);
     }
 
