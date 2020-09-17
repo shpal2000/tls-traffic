@@ -87,13 +87,8 @@ void tls_server_app::free_socket(ev_socket* ev_sock)
     delete ev_sock;
 }
 
-void tls_server_socket::on_establish ()
+void tls_server_socket::ssl_init ()
 {
-    // printf ("on_establish\n");
-    m_lsock = (tls_server_socket*) get_parent();
-    m_app = m_lsock->m_app;
-    m_srv_grp = m_lsock->m_srv_grp;
-
     if (m_srv_grp->m_emulation_id == 0){
         m_ssl = SSL_new (m_srv_grp->m_ssl_ctx);
     }else{
@@ -113,14 +108,31 @@ void tls_server_socket::on_establish ()
         //stats
         abort ();
     }
+
+    m_ssl_init = true;
+}
+
+void tls_server_socket::on_establish ()
+{
+    m_lsock = (tls_server_socket*) get_parent();
+    m_app = m_lsock->m_app;
+    m_srv_grp = m_lsock->m_srv_grp;
+
+    if (m_srv_grp->m_cs_start_tls_len == 0
+        && m_srv_grp->m_sc_start_tls_len == 0)
+    {
+        ssl_init ();
+    }
 }
 
 void tls_server_socket::on_write ()
 {
-    // printf ("on_write\n");
     if (m_bytes_written < m_srv_grp->m_sc_data_len) {
-        int next_chunk 
-            = m_srv_grp->m_sc_data_len - m_bytes_written;
+        int next_chunk = m_srv_grp->m_sc_data_len - m_bytes_written;
+        if (not m_ssl_init)
+        {
+            next_chunk = m_srv_grp->m_sc_start_tls_len - m_bytes_written;
+        }
 
         int next_chunk_target = m_srv_grp->m_write_chunk;
         if (next_chunk_target == 0) {
@@ -143,10 +155,10 @@ void tls_server_socket::on_write ()
 
 void tls_server_socket::on_wstatus (int bytes_written, int write_status)
 {
-    // printf ("on_wstatus\n");
     if (write_status == WRITE_STATUS_NORMAL) {
         m_bytes_written += bytes_written;
-        if (m_bytes_written == m_srv_grp->m_sc_data_len) {
+        if (m_bytes_written == m_srv_grp->m_sc_data_len)
+        {
             if (m_srv_grp->m_close == close_reset){
                 abort ();
             } else {
@@ -164,6 +176,12 @@ void tls_server_socket::on_wstatus (int bytes_written, int write_status)
                 }
             }
         }
+        else if (not m_ssl_init
+                    && m_bytes_written == m_srv_grp->m_sc_start_tls_len
+                    && m_bytes_read == m_srv_grp->m_cs_start_tls_len)
+        {
+            ssl_init ();
+        }
     } else {
         abort ();
     }
@@ -171,26 +189,41 @@ void tls_server_socket::on_wstatus (int bytes_written, int write_status)
 
 void tls_server_socket::on_read ()
 {
-    // printf ("on_read\n");
-    read_next_data (m_srv_grp->m_read_buffer, 0, m_srv_grp->m_read_buffer_len, true);
+    int next_chunk = m_srv_grp->m_read_buffer_len;
+    if (not m_ssl_init) 
+    {
+        next_chunk = m_srv_grp->m_cs_start_tls_len - m_bytes_read;
+        if (next_chunk > m_srv_grp->m_read_buffer_len)
+        {
+            next_chunk = m_srv_grp->m_read_buffer_len;
+        }
+    }
+
+    read_next_data (m_srv_grp->m_read_buffer, 0, next_chunk, true);
 }
 
 void tls_server_socket::on_rstatus (int bytes_read, int read_status)
 {
-    // printf ("on_rstatus\n");
     if (bytes_read == 0) 
     {
         if (read_status != READ_STATUS_TCP_CLOSE) {
             abort ();
         }
-    } else {
+    } 
+    else
+    {
         m_bytes_read += bytes_read;
+        if (not m_ssl_init
+                    && m_bytes_written == m_srv_grp->m_sc_start_tls_len
+                    && m_bytes_read == m_srv_grp->m_cs_start_tls_len)
+        {
+            ssl_init ();
+        }
     }
 }
 
 void tls_server_socket::on_finish ()
 {
-    // printf ("on_free\n");
     if (m_ssl) {
         SSL_free (m_ssl);
         m_ssl = nullptr;

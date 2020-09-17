@@ -146,6 +146,7 @@ public:
         m_bytes_written = 0;
         m_bytes_read = 0;
         m_ssl = nullptr;
+        m_ssl_init = false;
     };
 
     virtual ~tls_client_socket()
@@ -168,6 +169,7 @@ public:
     SSL* m_ssl;
     int m_bytes_written;
     int m_bytes_read;
+    bool m_ssl_init;
 };
 
 #endif

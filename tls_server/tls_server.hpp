@@ -277,13 +277,16 @@ public:
         m_bytes_written = 0;
         m_bytes_read = 0;
         m_ssl = nullptr;
-        m_ssl_ctx = nullptr;  
+        m_ssl_ctx = nullptr;
+        m_ssl_init = false;
     };
 
     virtual ~tls_server_socket()
     {
 
     };
+
+    void ssl_init ();
 
     void on_establish ();
     void on_write ();
@@ -302,6 +305,7 @@ public:
 
 private:
     SSL_CTX* m_ssl_ctx;
+    bool m_ssl_init;
 };
 
 #define inc_tls_server_stats(__stat_name) \
