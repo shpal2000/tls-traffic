@@ -178,22 +178,13 @@ void tls_client_socket::ssl_init ()
 
 void tls_client_socket::on_establish ()
 {
-    if (m_cs_grp->m_cs_start_tls_len == 0
-        && m_cs_grp->m_sc_start_tls_len == 0)
-    {
-        ssl_init ();
-    }
 }
 
 void tls_client_socket::on_write ()
 {
-    if (m_bytes_written < m_cs_grp->m_cs_data_len) {
-        int next_chunk = m_cs_grp->m_cs_data_len - m_bytes_written;
-        if (not m_ssl_init)
-        {
-            next_chunk = m_cs_grp->m_cs_start_tls_len - m_bytes_written;
-        }
-
+    if (m_bytes_written < m_cs_grp->m_cs_start_tls_len)
+    {
+        int next_chunk = m_cs_grp->m_cs_start_tls_len - m_bytes_written;
         int next_chunk_target = m_cs_grp->m_write_chunk;
         if (next_chunk_target == 0) {
             next_chunk_target = m_app->get_next_chunk_size ();
@@ -208,15 +199,47 @@ void tls_client_socket::on_write ()
         }
 
         write_next_data (m_cs_grp->m_write_buffer, 0, next_chunk, true);
+    }
+    else
+    {
+        if (m_ssl_init) 
+        {
+            if (m_bytes_written < m_cs_grp->m_cs_data_len) {
+                int next_chunk = m_cs_grp->m_cs_data_len - m_bytes_written;
+                int next_chunk_target = m_cs_grp->m_write_chunk;
+                if (next_chunk_target == 0) {
+                    next_chunk_target = m_app->get_next_chunk_size ();
+                }
 
-    } else {
-        disable_wr_notification ();
+                if ( next_chunk > next_chunk_target){
+                    next_chunk = next_chunk_target;
+                }
+
+                if ( next_chunk > m_cs_grp->m_write_buffer_len){
+                    next_chunk = m_cs_grp->m_write_buffer_len;
+                }
+
+                write_next_data (m_cs_grp->m_write_buffer, 0, next_chunk, true);
+
+            } else {
+                disable_wr_notification ();
+            }
+        }
+        else
+        {
+            if ((m_bytes_written == m_cs_grp->m_cs_start_tls_len)
+                    && (m_bytes_read == m_cs_grp->m_sc_start_tls_len))
+            {
+                ssl_init();
+            }
+        }
     }
 }
 
 void tls_client_socket::on_wstatus (int bytes_written, int write_status)
 {
-    if (write_status == WRITE_STATUS_NORMAL) {
+    if (write_status == WRITE_STATUS_NORMAL) 
+    {
         m_bytes_written += bytes_written;        
         if (m_bytes_written == m_cs_grp->m_cs_data_len) 
         {
@@ -236,31 +259,41 @@ void tls_client_socket::on_wstatus (int bytes_written, int write_status)
                         break;
                 }
             }
-        }
-        else if (not m_ssl_init
-                    && m_bytes_written == m_cs_grp->m_cs_start_tls_len
-                    && m_bytes_read == m_cs_grp->m_sc_start_tls_len)
-        {
-            ssl_init ();
-        }
-    } else {
+        }       
+    } 
+    else 
+    {
         abort ();
     }
 }
 
 void tls_client_socket::on_read ()
 {
-    int next_chunk = m_cs_grp->m_read_buffer_len;
-    if (not m_ssl_init) 
+    if (m_bytes_read < m_cs_grp->m_sc_start_tls_len)
     {
-        next_chunk = m_cs_grp->m_sc_start_tls_len - m_bytes_read;
+        int next_chunk = m_cs_grp->m_sc_start_tls_len - m_bytes_read;
         if (next_chunk > m_cs_grp->m_read_buffer_len)
         {
             next_chunk = m_cs_grp->m_read_buffer_len;
         }
+        read_next_data (m_cs_grp->m_read_buffer, 0, next_chunk, true);
     }
-
-    read_next_data (m_cs_grp->m_read_buffer, 0, next_chunk, true);
+    else
+    {
+        if (m_ssl_init)
+        {
+            int next_chunk = m_cs_grp->m_read_buffer_len;
+            read_next_data (m_cs_grp->m_read_buffer, 0, next_chunk, true);
+        }
+        else
+        {
+            if ((m_bytes_written == m_cs_grp->m_cs_start_tls_len)
+                    && (m_bytes_read == m_cs_grp->m_sc_start_tls_len))
+            {
+                ssl_init();
+            }  
+        }
+    }
 }
 
 void tls_client_socket::on_rstatus (int bytes_read, int read_status)
@@ -274,12 +307,6 @@ void tls_client_socket::on_rstatus (int bytes_read, int read_status)
     else 
     {
         m_bytes_read += bytes_read;
-        if (not m_ssl_init
-                    && m_bytes_written == m_cs_grp->m_cs_start_tls_len
-                    && m_bytes_read == m_cs_grp->m_sc_start_tls_len)
-        {
-            ssl_init ();
-        }
     }
 }
 
