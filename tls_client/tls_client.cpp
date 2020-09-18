@@ -166,8 +166,8 @@ void tls_client_socket::ssl_init ()
 {
     m_ssl = SSL_new (m_cs_grp->m_ssl_ctx);
     if (m_ssl){
-        set_as_ssl_client (m_ssl);
         SSL_set_tlsext_host_name (m_ssl, "www.google.com");
+        set_as_ssl_client (m_ssl);
     } else {
         //stats
         abort ();
