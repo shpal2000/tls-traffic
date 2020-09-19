@@ -13,6 +13,7 @@ executable('tlspack.exe'
                           , '../tlspack-socket/ev_app.cpp'
                           , './tls_server/tls_server.cpp'
                           , './tls_client/tls_client.cpp'
+                          , './rpc_server/rpc_server.cpp'
                           , './tcp_proxy/tcp_proxy.cpp'
                           , 'main.cpp' ]
             , dependencies: [openssl, nlohmann_json_dep]
