@@ -5,11 +5,14 @@
 #include <signal.h>
 #include <chrono>
 
+#include "./rpc_server/rpc_server.hpp"
+
 #include "./tls_server/tls_server.hpp"
 #include "./tls_client/tls_client.hpp"
 #include "./tcp_proxy/tcp_proxy.hpp"
 
 app_stats* zone_ev_sockstats = nullptr;
+rpc_server_stats* zone_rpc_server_stats = nullptr;
 tls_server_stats* zone_tls_server_stats = nullptr;
 tls_client_stats* zone_tls_client_stats = nullptr;
 tcp_proxy_stats* zone_tcp_proxy_stats = nullptr;
@@ -146,6 +149,10 @@ int main(int /*argc*/, char **argv)
 
     if ( app_list )
     {
+        zone_rpc_server_stats = new rpc_server_stats ();
+        app* rpc_app = new rpc_server_app ("", 10, zone_rpc_server_stats);
+        app_list->push_back (rpc_app);
+
         std::ofstream started_file_stream(started_file);
         started_file_stream << "started" << std::endl;
 
