@@ -38,6 +38,12 @@ public:
     ev_socket* alloc_socket();
     void free_socket(ev_socket* ev_sock);
 
+    virtual int rpc_handler (const char* /* rpc_cmd_str */
+                                    , char* /* rpc_resp_str */
+                                    , int /* rpc_resp_max */ ) {
+        return 0;
+    };
+
 private:
     ev_sockaddr m_srvr_addr;
     ev_socket_opt m_sock_opt;
@@ -55,6 +61,8 @@ public:
 
         m_read_buff = (char*) malloc(m_max_buff_len);
         m_write_buff = (char*) malloc(m_max_buff_len);
+
+        m_max_buff_len -= 1;
     };
 
     virtual ~rpc_server_socket()

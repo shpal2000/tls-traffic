@@ -17,6 +17,8 @@ tls_server_stats* zone_tls_server_stats = nullptr;
 tls_client_stats* zone_tls_client_stats = nullptr;
 tcp_proxy_stats* zone_tcp_proxy_stats = nullptr;
 
+rpc_server_app* zone_rpc_app = nullptr;
+
 static void system_cmd (const char* label, const char* cmd_str)
 {
     printf ("%s ---- %s\n\n", label, cmd_str);
@@ -126,6 +128,36 @@ static std::vector<app*>* create_app_list (json cfg_json, int z_index)
     return app_list;
 }
 
+class zone_rpc_app : rpc_server_app
+{
+public:
+
+    int rpc_handler (const char* rpc_cmd_str
+                        , char* rpc_resp_str
+                        , int rpc_resp_max)
+    {
+        int ret = 0;
+        json rpc_json = json::parse(rpc_cmd_str);
+        const char* rpc_cmd = rpc_json["cmd"].get<std::string>().c_str();
+
+        if (strcmp(rpc_cmd, "stop") == 0) {
+            strcpy (rpc_resp_str, "{}");
+        } else if (strcmp(rpc_cmd, "abort") == 0) {
+            strcpy (rpc_resp_str, "{}");
+        } else if (strcmp(rpc_cmd, "get_ev_sockstats") == 0) {
+            json j;
+            zone_ev_sockstats->dump_json(j);
+            std::string s = j.dump();
+            if (s.size() < (size_t) rpc_resp_max) {
+                strcpy (rpc_resp_str, s.c_str());
+                ret = s.size() + 1;
+            }
+        }
+
+        return ret;
+    };
+};
+
 int main(int /*argc*/, char **argv) 
 {
     char stats_file [4096];
@@ -149,9 +181,11 @@ int main(int /*argc*/, char **argv)
 
     if ( app_list )
     {
+        const char* rpc_ip = cfg_json["rpc_ip"].get<std::string>().c_str();
+        u_short rpc_port = cfg_json["rpc_port"].get<int>();
         zone_rpc_server_stats = new rpc_server_stats ();
-        app* rpc_app = new rpc_server_app ("", 10, zone_rpc_server_stats);
-        app_list->push_back (rpc_app);
+        zone_rpc_app = new rpc_server_app (rpc_ip, rpc_port, zone_rpc_server_stats);
+        app_list->push_back (zone_rpc_app);
 
         std::ofstream started_file_stream(started_file);
         started_file_stream << "started" << std::endl;

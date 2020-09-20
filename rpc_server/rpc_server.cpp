@@ -57,10 +57,15 @@ void rpc_server_socket::on_establish ()
 
 void rpc_server_socket::on_write ()
 {
-    
+    int resp_len = m_app->rpc_handler(m_read_buff, m_write_buff, m_max_buff_len);
+
+     if (resp_len > 0)
+     {
+         write_next_data (m_write_buff, 0, resp_len, false);
+     }
 }
 
-void rpc_server_socket::on_wstatus (int bytes_written, int write_status)
+void rpc_server_socket::on_wstatus (int /* bytes_written */, int write_status)
 {
     if (write_status == WRITE_STATUS_NORMAL) 
     {
@@ -101,6 +106,7 @@ void rpc_server_socket::on_rstatus (int bytes_read, int read_status)
     else
     {
         m_read_buff_off += bytes_read;
+        m_read_buff [m_read_buff_off] = '\0';
     }
 }
 
