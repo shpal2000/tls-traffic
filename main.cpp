@@ -19,12 +19,14 @@ tcp_proxy_stats* zone_tcp_proxy_stats = nullptr;
 
 rpc_server_app* zone_rpc_app = nullptr;
 
+/*
 static void system_cmd (const char* label, const char* cmd_str)
 {
     printf ("%s ---- %s\n\n", label, cmd_str);
     fflush (NULL);
     system (cmd_str);
 }
+
 
 static void dump_stats (const char* out_file, app_stats* stats) 
 {
@@ -47,6 +49,8 @@ static void config_zone (json cfg_json
         system_cmd ("zone_cmd", cmd.c_str());
     }
 }
+*/
+
 
 static std::vector<app*>* create_app_list (json cfg_json, int z_index)
 {
@@ -160,17 +164,13 @@ public:
 
 int main(int /*argc*/, char **argv) 
 {
-    char stats_file [4096];
-
-    char* result_dir = argv[1];
-    char* started_file = argv[2];
+    char* rpc_ip = argv[1];
+    int rpc_port = atoi (argv[2]);
     char* cfg_file = argv[3];
     int z_index = atoi (argv[4]);
 
     std::ifstream cfg_stream(cfg_file);
     json cfg_json = json::parse(cfg_stream);
-        
-    config_zone (cfg_json, z_index);
 
     signal(SIGPIPE, SIG_IGN);
 
@@ -181,18 +181,13 @@ int main(int /*argc*/, char **argv)
 
     if ( app_list )
     {
-        const char* rpc_ip = cfg_json["rpc_ip"].get<std::string>().c_str();
-        u_short rpc_port = cfg_json["rpc_port"].get<int>();
         zone_rpc_server_stats = new rpc_server_stats ();
         zone_rpc_app = new rpc_server_app (rpc_ip, rpc_port, zone_rpc_server_stats);
         app_list->push_back (zone_rpc_app);
 
-        std::ofstream started_file_stream(started_file);
-        started_file_stream << "started" << std::endl;
-
         std::chrono::time_point<std::chrono::system_clock> start, end;
         start = std::chrono::system_clock::now();
-        int tick_5sec = 0;
+
         bool is_tick_sec = false;
         while (1)
         {
@@ -206,7 +201,6 @@ int main(int /*argc*/, char **argv)
             {
                 start = end;
                 is_tick_sec = true;
-                tick_5sec++;
             }
 
             for (app* app_ptr : *app_list)
@@ -220,52 +214,6 @@ int main(int /*argc*/, char **argv)
 
                 is_tick_sec = false;
             }
-
-            if (tick_5sec == 5)
-            {
-                tick_5sec = 0;
-
-                sprintf (stats_file, "%s/ev_sockstats.json", result_dir);
-                dump_stats (stats_file, zone_ev_sockstats);
-
-                if (zone_tls_server_stats)
-                {
-                    sprintf (stats_file, "%s/tls_server_stats.json", result_dir);
-                    dump_stats (stats_file, zone_tls_server_stats);
-                }
-
-                if (zone_tls_client_stats)
-                {
-                    sprintf (stats_file, "%s/tls_client_stats.json", result_dir);
-                    dump_stats (stats_file, zone_tls_client_stats);
-                }
-
-                for (app* app_ptr : *app_list)
-                {
-                    sprintf (stats_file,
-                        "%s/"
-                        "%s/%s_stats.json",
-                        result_dir,
-                        app_ptr->get_app_label(), app_ptr->get_app_type());
-                    dump_stats (stats_file
-                                , (app_stats*)app_ptr->get_app_stats());
-
-                    ev_stats_map* app_stats_map 
-                        = app_ptr->get_app_stats_map ();
-                    for (auto it=app_stats_map->begin(); 
-                            it!=app_stats_map->end(); ++it)
-                    {
-                        sprintf (stats_file,
-                        "%s/"
-                        "%s/%s/"
-                        "%s_stats.json",
-                        result_dir,
-                        app_ptr->get_app_label(), it->first.c_str(),
-                        app_ptr->get_app_type());
-                        dump_stats (stats_file, (app_stats*)it->second);  
-                    }
-                }
-            }
         }
 
         for (std::string line; std::getline(std::cin, line);) 
@@ -276,9 +224,6 @@ int main(int /*argc*/, char **argv)
     else
     {
         printf ("no apps!\n");
-
-        std::ofstream started_file_stream(started_file);
-        started_file_stream << "no apps!" << std::endl;
         exit (-1);
     }
 
