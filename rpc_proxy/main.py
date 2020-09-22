@@ -58,6 +58,12 @@ async def start(params : StartParam):
     cmd_str = "ip netns exec ns-tool ip link set dev veth2 up"
     os.system (cmd_str)
     
+    with open(params.cfg_file) as f:
+        zone_cmds = json.load(f)["zones"][params.z_index]["zone_cmds"]
+        for cmd in zone_cmds:
+            cmd_str = "ip netns exec ns-tool {}".format(cmd)
+            os.system (cmd_str)
+
     cmd_str = "ip netns exec {} /usr/local/bin/tlspack.exe {} {} {} {} &".format('ns-tool'
                                 , '192.168.1.2', 8081, params.cfg_file, params.z_index)
     os.system (cmd_str)
@@ -135,7 +141,7 @@ async def stop(params : StopParam):
                 writer.write_eof()
 
                 response = await reader.read (-1)
-                
+
                 writer.close()
                 await writer.wait_closed()
 
