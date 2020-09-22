@@ -243,6 +243,7 @@ public:
     {
         m_next_chunk_index = 0;
         m_next_chunk_shift = 0;
+        m_stop = false;
     }
     virtual ~app()
     {
@@ -251,6 +252,17 @@ public:
     virtual void run_iter(bool tick_sec)
     {
         ev_app::run_iter (tick_sec);
+    }
+
+    void set_stop(){
+        m_stop = true;
+    }
+
+    bool is_zero_conn_state(){
+        if (m_app_stats->tcpConnInitInUse == 0) {
+            return true;
+        }
+        return false;
     }
 
     ev_stats_map* get_app_stats_map ()
@@ -281,19 +293,21 @@ public:
     {
         int n = 0;
 
-        if (m_client_curr_conn_count == 0){
-            m_conn_init_time = std::chrono::steady_clock::now ();
-            n = 1;
-        } else if ((m_client_total_conn_count == 0) 
-                    || (m_client_curr_conn_count < m_client_total_conn_count)) {
+        if (not m_stop) {
+            if (m_client_curr_conn_count == 0){
+                m_conn_init_time = std::chrono::steady_clock::now ();
+                n = 1;
+            } else if ((m_client_total_conn_count == 0) 
+                        || (m_client_curr_conn_count < m_client_total_conn_count)) {
 
-            if ( (m_client_max_active_conn_count == 0) || (m_app_stats->tcpConnInitInUse < m_client_max_active_conn_count) )  {
-                auto t = std::chrono::steady_clock::now();
-                auto span = std::chrono::duration_cast<std::chrono::nanoseconds>
-                                                (t - m_conn_init_time).count();
-                uint64_t c = (m_client_cps * span) / 1000000000;
-                if (c > m_client_curr_conn_count ) {
-                    n = 1;
+                if ( (m_client_max_active_conn_count == 0) || (m_app_stats->tcpConnInitInUse < m_client_max_active_conn_count) )  {
+                    auto t = std::chrono::steady_clock::now();
+                    auto span = std::chrono::duration_cast<std::chrono::nanoseconds>
+                                                    (t - m_conn_init_time).count();
+                    uint64_t c = (m_client_cps * span) / 1000000000;
+                    if (c > m_client_curr_conn_count ) {
+                        n = 1;
+                    }
                 }
             }
         }
@@ -351,6 +365,7 @@ private:
     };
     int m_next_chunk_index;
     int m_next_chunk_shift;
+    bool m_stop;
 
 protected:
     uint32_t m_client_cps;

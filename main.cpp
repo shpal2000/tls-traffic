@@ -17,41 +17,6 @@ tls_server_stats* zone_tls_server_stats = nullptr;
 tls_client_stats* zone_tls_client_stats = nullptr;
 tcp_proxy_stats* zone_tcp_proxy_stats = nullptr;
 
-rpc_server_app* zone_rpc_app = nullptr;
-
-/*
-static void system_cmd (const char* label, const char* cmd_str)
-{
-    printf ("%s ---- %s\n\n", label, cmd_str);
-    fflush (NULL);
-    system (cmd_str);
-}
-
-
-static void dump_stats (const char* out_file, app_stats* stats) 
-{
-    json j;
-    
-    stats->dump_json(j);
-
-    std::ofstream stats_stream(out_file);
-    stats_stream << j << std::endl;
-}
-
-static void config_zone (json cfg_json
-                            , int z_index)
-{
-    auto zone_cmds = cfg_json["zones"][z_index]["zone_cmds"];
-
-    //run all zone commands
-    for (auto cmd_it = zone_cmds.begin(); cmd_it != zone_cmds.end(); ++cmd_it) {
-        auto cmd = cmd_it.value().get<std::string>();
-        system_cmd ("zone_cmd", cmd.c_str());
-    }
-}
-*/
-
-
 static std::vector<app*>* create_app_list (json cfg_json, int z_index)
 {
     std::vector<app*> *app_list = nullptr;
@@ -132,35 +97,73 @@ static std::vector<app*>* create_app_list (json cfg_json, int z_index)
     return app_list;
 }
 
-class zone_rpc_app : rpc_server_app
+#define STOP_BEGIN          1
+#define STOP_PROGRESS       2
+#define STOP_FINISH         3
+#define STOP_NOTIFICATION   4         
+
+class zone_rpc_app : public rpc_server_app
 {
 public:
+    int m_stop_state;
+public:
+    zone_rpc_app (const char* srv_ip
+                    , u_short srv_port
+                    , rpc_server_stats* srv_stats) 
+        : rpc_server_app (srv_ip, srv_port, srv_stats){
+        
+        m_stop_state = 0;
+    }
 
-    int rpc_handler (const char* rpc_cmd_str
-                        , char* rpc_resp_str
+    int rpc_handler (const char* rpc_cmd
+                        , char* rpc_resp
                         , int rpc_resp_max)
     {
         int ret = 0;
-        json rpc_json = json::parse(rpc_cmd_str);
-        const char* rpc_cmd = rpc_json["cmd"].get<std::string>().c_str();
 
         if (strcmp(rpc_cmd, "stop") == 0) {
-            strcpy (rpc_resp_str, "{}");
-        } else if (strcmp(rpc_cmd, "abort") == 0) {
-            strcpy (rpc_resp_str, "{}");
+            if (m_stop_state < STOP_BEGIN) {
+                m_stop_state = STOP_BEGIN;
+            }
+            switch (m_stop_state)
+            {
+            case STOP_BEGIN:
+                strcpy (rpc_resp, "{\"cmd_resp\" : \"STOP_BEGIN\"}");
+                break;
+            case STOP_PROGRESS:
+                strcpy (rpc_resp, "{\"cmd_resp\" : \"STOP_PROGRESS\"}");
+                break;
+            case STOP_FINISH:
+                strcpy (rpc_resp, "{\"cmd_resp\" : \"STOP_FINISH\"}");
+                break;
+            default:
+                strcpy (rpc_resp, "{\"cmd_resp\" : \"STOP_ERROR\"}");
+                break;
+            }
+        } else if (strcmp(rpc_cmd, "is_init") == 0) {
+            strcpy (rpc_resp, "{\"cmd_resp\" : \"init_done\"}");
         } else if (strcmp(rpc_cmd, "get_ev_sockstats") == 0) {
             json j;
             zone_ev_sockstats->dump_json(j);
             std::string s = j.dump();
             if (s.size() < (size_t) rpc_resp_max) {
-                strcpy (rpc_resp_str, s.c_str());
-                ret = s.size() + 1;
+                strcpy (rpc_resp, s.c_str());
+                ret = s.size();
             }
+        } else {
+            strcpy (rpc_resp, "{\"cmd_resp\" : \"unknown_cmd\"}");
+        }
+
+        if (ret == 0)
+        {
+            ret = strlen(rpc_resp);
         }
 
         return ret;
     };
 };
+
+zone_rpc_app* zone_rpc = nullptr;
 
 int main(int /*argc*/, char **argv) 
 {
@@ -182,14 +185,13 @@ int main(int /*argc*/, char **argv)
     if ( app_list )
     {
         zone_rpc_server_stats = new rpc_server_stats ();
-        zone_rpc_app = new rpc_server_app (rpc_ip, rpc_port, zone_rpc_server_stats);
-        app_list->push_back (zone_rpc_app);
+        zone_rpc = new zone_rpc_app (rpc_ip, rpc_port, zone_rpc_server_stats);
 
         std::chrono::time_point<std::chrono::system_clock> start, end;
         start = std::chrono::system_clock::now();
 
         bool is_tick_sec = false;
-        while (1)
+        while (zone_rpc->m_stop_state < STOP_NOTIFICATION)
         {
             std::this_thread::sleep_for(std::chrono::microseconds(1));
             end = std::chrono::system_clock::now();
@@ -203,9 +205,37 @@ int main(int /*argc*/, char **argv)
                 is_tick_sec = true;
             }
 
-            for (app* app_ptr : *app_list)
-            {
-                app_ptr->run_iter (is_tick_sec);
+            if (zone_rpc->m_stop_state == STOP_BEGIN 
+                    && zone_rpc->m_stop_state < STOP_PROGRESS) {
+
+                zone_rpc->m_stop_state = STOP_PROGRESS;
+                for (app* app_ptr : *app_list)
+                {
+                    app_ptr->set_stop();
+                }
+            }
+
+            if (zone_rpc->m_stop_state < STOP_FINISH) {
+                for (app* app_ptr : *app_list)
+                {
+                    app_ptr->run_iter (is_tick_sec);
+                }
+            }
+
+            zone_rpc->run_iter (is_tick_sec);
+
+            if (zone_rpc->m_stop_state == STOP_PROGRESS){
+                bool is_zero_conn_state = true;
+                for (app* app_ptr : *app_list)
+                {
+                    if (not app_ptr->is_zero_conn_state()) {
+                        is_zero_conn_state = false;
+                        break;
+                    }
+                }
+                if (is_zero_conn_state){
+                    zone_rpc->m_stop_state = STOP_FINISH;
+                }
             }
 
             if (is_tick_sec) 
@@ -214,11 +244,6 @@ int main(int /*argc*/, char **argv)
 
                 is_tick_sec = false;
             }
-        }
-
-        for (std::string line; std::getline(std::cin, line);) 
-        {
-            std::cout << line << std::endl;
         }
     }
     else

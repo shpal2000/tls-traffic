@@ -62,6 +62,8 @@ void rpc_server_socket::on_write ()
      if (resp_len > 0)
      {
          write_next_data (m_write_buff, 0, resp_len, false);
+     }else{
+        abort();  
      }
 }
 
