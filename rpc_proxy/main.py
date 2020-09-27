@@ -15,18 +15,20 @@ app = FastAPI()
 class StartParam(BaseModel):
     cfg_file: str
     z_index: int
-    netdev_list: List [str]
+    net_ifaces: List [str]
     timeout: Optional [int] = 15
 
 class AbortParam(BaseModel):
-    netdev_list: List [str]
+    net_ifaces: List [str]
 
 class StopParam(BaseModel):
-    netdev_list: List [str]
+    net_ifaces: List [str]
     timeout: Optional [int] = 15
 
 @app.post('/start')
 async def start(params : StartParam):
+
+    # pdb.set_trace()
 
     cmd_str = "kill -0 $(ps aux | grep '[t]lspack.exe' | awk '{print $2}')"
     status = os.system (cmd_str)
@@ -36,7 +38,7 @@ async def start(params : StartParam):
     cmd_str = "ip netns add ns-tool"
     os.system (cmd_str)
 
-    for netdev in params.netdev_list:
+    for netdev in params.net_ifaces:
         cmd_str = "ip link set dev {} netns ns-tool".format(netdev)
         os.system (cmd_str)
 
@@ -109,7 +111,7 @@ async def abort(params : AbortParam):
     cmd_str = "ip link delete veth1"
     os.system (cmd_str)
 
-    for netdev in params.netdev_list:
+    for netdev in params.net_ifaces:
         cmd_str = "ip netns exec ns-tool ip link set {} netns 1".format(netdev)
         os.system (cmd_str)
 
@@ -161,7 +163,7 @@ async def stop(params : StopParam):
     cmd_str = "ip link delete veth1"
     os.system (cmd_str)
 
-    for netdev in params.netdev_list:
+    for netdev in params.net_ifaces:
         cmd_str = "ip netns exec ns-tool ip link set {} netns 1".format(netdev)
         os.system (cmd_str)
 
