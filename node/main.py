@@ -8,6 +8,9 @@ import json
 import sys
 import os
 import pdb
+import time
+from pymongo import MongoClient
+
 
 
 app = FastAPI()
@@ -15,7 +18,11 @@ app = FastAPI()
 class StartParam(BaseModel):
     cfg_file: str
     z_index: int
+    z_type: str
     net_ifaces: List [str]
+    result_db_cstring: str
+    result_db_name: str
+    result_col_name: str
     timeout: Optional [int] = 15
 
 class AbortParam(BaseModel):
@@ -26,8 +33,20 @@ class StopParam(BaseModel):
     timeout: Optional [int] = 15
 
 
-async def collect_stats(ip: str, port: int, stats_file:str):
+async def collect_stats(ip: str, port: int
+                        , result_db_cstring: str
+                        , result_db_name: str
+                        , result_col_name: str
+                        , z_index: int
+                        , z_type: str):
+    mongoClient = MongoClient (result_db_cstring)
+    db = mongoClient[result_db_name]
+    statsCol = db[result_col_name]
+    stats_init_time = time.time()
+    statsCol.remove({})
     while True:
+        await asyncio.sleep(1)
+
         cmd_str = "kill -0 $(ps aux | grep '[t]lspack.exe' | awk '{print $2}')"
         status = os.system (cmd_str)
         if status: #not running
@@ -47,12 +66,12 @@ async def collect_stats(ip: str, port: int, stats_file:str):
 
             j_stats = json.loads (response)
 
-            with open (stats_file, 'w') as f:
-                f.write(json.dumps(j_stats, indent=4))
+            j_stats ['z_index'] = z_index
+            j_stats ['z_type'] = z_type
+            j_stats ['tick_sec'] = int(time.time() - stats_init_time)
+            statsCol.insert_one(j_stats)
         except:
             pass
-
-        await asyncio.sleep(1)
 
 
 @app.post('/start')
@@ -127,7 +146,11 @@ async def start(params : StartParam, background_tasks: BackgroundTasks):
 
     if init_done:
         background_tasks.add_task(collect_stats, '192.168.1.2', 8081
-                                    , '/rundir/bin/tmp_{}.json'.format (params.z_index))
+                                    , params.result_db_cstring
+                                    , params.result_db_name
+                                    , params.result_col_name
+                                    , params.z_index
+                                    , params.z_type)
         return {"status" : 0}
 
     return {"status" : -1, 'error' : 'timeout'}
