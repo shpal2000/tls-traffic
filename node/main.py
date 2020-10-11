@@ -9,20 +9,14 @@ import sys
 import os
 import pdb
 import time
-from pymongo import MongoClient
-
-
 
 app = FastAPI()
+appStats = {}
 
 class StartParam(BaseModel):
     cfg_file: str
     z_index: int
-    z_type: str
     net_ifaces: List [str]
-    result_db_cstring: str
-    result_db_name: str
-    result_col_name: str
     timeout: Optional [int] = 15
 
 class AbortParam(BaseModel):
@@ -33,20 +27,9 @@ class StopParam(BaseModel):
     timeout: Optional [int] = 15
 
 
-async def collect_stats(ip: str, port: int
-                        , result_db_cstring: str
-                        , result_db_name: str
-                        , result_col_name: str
-                        , z_index: int
-                        , z_type: str):
-    mongoClient = MongoClient (result_db_cstring)
-    db = mongoClient[result_db_name]
-    statsCol = db[result_col_name]
-    stats_init_time = time.time()
-    statsCol.remove({})
+async def collect_stats(ip: str, port: int):
+    global appStats
     while True:
-        await asyncio.sleep(1)
-
         cmd_str = "kill -0 $(ps aux | grep '[t]lspack.exe' | awk '{print $2}')"
         status = os.system (cmd_str)
         if status: #not running
@@ -64,14 +47,11 @@ async def collect_stats(ip: str, port: int
             writer.close()
             await writer.wait_closed()
 
-            j_stats = json.loads (response)
-
-            j_stats ['z_index'] = z_index
-            j_stats ['z_type'] = z_type
-            j_stats ['tick_sec'] = int(time.time() - stats_init_time)
-            statsCol.insert_one(j_stats)
+            appStats = json.loads (response)
         except:
             pass
+
+        await asyncio.sleep(1)
 
 
 @app.post('/start')
@@ -145,12 +125,7 @@ async def start(params : StartParam, background_tasks: BackgroundTasks):
             pass
 
     if init_done:
-        background_tasks.add_task(collect_stats, '192.168.1.2', 8081
-                                    , params.result_db_cstring
-                                    , params.result_db_name
-                                    , params.result_col_name
-                                    , params.z_index
-                                    , params.z_type)
+        background_tasks.add_task(collect_stats, '192.168.1.2', 8081)
         return {"status" : 0}
 
     return {"status" : -1, 'error' : 'timeout'}
@@ -231,35 +206,8 @@ async def stop(params : StopParam):
 
 @app.get('/ev_sockstats')
 async def ev_sockstats():
+    return appStats
 
-    cmd_str = "kill -0 $(ps aux | grep '[t]lspack.exe' | awk '{print $2}')"
-    status = os.system (cmd_str)
-    if status: #not running
-        return {'status' : -3, 'error' : 'not running'}
-
-    stats_done = False
-    try:
-        reader, writer = await asyncio.open_connection ('192.168.1.2'
-                                                        , 8081, ssl=False)
-
-        writer.write("get_ev_sockstats".encode())
-        await writer.drain()
-        writer.write_eof()
-
-        response = await reader.read (-1)
-
-        writer.close()
-        await writer.wait_closed()
-
-        j_stats = json.loads (response)
-
-        stats_done = True
-    except:
-        pass
-
-    if stats_done:
-        return {'status' : 0, 'stats' : j_stats }
-    return {"status" : -1, 'error' : 'unknown'}
 
 if __name__ == '__main__':
     rpc_proxy_ip = sys.argv[1]
