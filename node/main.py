@@ -11,12 +11,19 @@ import pdb
 import time
 
 app = FastAPI()
+
 appStats = {}
+
+appRpcIp = None
+appRpcPort = None
 
 class StartParam(BaseModel):
     cfg_file: str
     z_index: int
     net_ifaces: List [str]
+    rpc_ip_veth1: str
+    rpc_ip_veth2: str
+    rpc_port: int
     timeout: Optional [int] = 15
 
 class AbortParam(BaseModel):
@@ -51,13 +58,16 @@ async def collect_stats(ip: str, port: int):
         except:
             pass
 
-        await asyncio.sleep(1)
+        await asyncio.sleep(0.1)
 
 
 @app.post('/start')
 async def start(params : StartParam, background_tasks: BackgroundTasks):
-
+    global appRpcIp, appRpcPort
     # pdb.set_trace()
+
+    appRpcIp = params.rpc_ip_veth2
+    appRpcPort = params.rpc_port
 
     cmd_str = "kill -0 $(ps aux | grep '[t]lspack.exe' | awk '{print $2}')"
     status = os.system (cmd_str)
@@ -74,7 +84,7 @@ async def start(params : StartParam, background_tasks: BackgroundTasks):
     cmd_str = "ip link add veth1 type veth peer name veth2"
     os.system (cmd_str)
 
-    cmd_str = "ip addr add 192.168.1.1/24 dev veth1"
+    cmd_str = "ip addr add {}/24 dev veth1".format(params.rpc_ip_veth1)
     os.system (cmd_str)
 
     cmd_str = "ip link set dev veth1 up"
@@ -83,7 +93,8 @@ async def start(params : StartParam, background_tasks: BackgroundTasks):
     cmd_str = "ip link set veth2 netns ns-tool"
     os.system (cmd_str)
 
-    cmd_str = "ip netns exec ns-tool ip addr add 192.168.1.2/24 dev veth2"
+    cmd_str = "ip netns exec ns-tool ip addr add {}/24 dev veth2". \
+                                                format(params.rpc_ip_veth2)
     os.system (cmd_str)
 
     cmd_str = "ip netns exec ns-tool ip link set dev veth2 up"
@@ -95,8 +106,12 @@ async def start(params : StartParam, background_tasks: BackgroundTasks):
             cmd_str = "ip netns exec ns-tool {}".format(cmd)
             os.system (cmd_str)
 
-    cmd_str = "ip netns exec {} /usr/local/bin/tlspack.exe {} {} {} {} &".format('ns-tool'
-                                , '192.168.1.2', 8081, params.cfg_file, params.z_index)
+    cmd_str = "ip netns exec {} /usr/local/bin/tlspack.exe {} {} {} {} &". \
+                                                                format('ns-tool'
+            , params.rpc_ip_veth2
+            , params.rpc_port
+            , params.cfg_file
+            , params.z_index)
     os.system (cmd_str)
 
     time_tick = 0
@@ -105,8 +120,9 @@ async def start(params : StartParam, background_tasks: BackgroundTasks):
         await asyncio.sleep(1)
         time_tick += 1
         try:
-            reader, writer = await asyncio.open_connection ('192.168.1.2'
-                                                            , 8081, ssl=False)
+            reader, writer = await asyncio.open_connection (params.rpc_ip_veth2
+                                                            , params.rpc_port
+                                                            , ssl=False)
 
             writer.write("is_init".encode())
             await writer.drain()
@@ -125,7 +141,9 @@ async def start(params : StartParam, background_tasks: BackgroundTasks):
             pass
 
     if init_done:
-        background_tasks.add_task(collect_stats, '192.168.1.2', 8081)
+        background_tasks.add_task(collect_stats
+                                    , params.rpc_ip_veth2
+                                    , params.rpc_port)
         return {"status" : 0}
 
     return {"status" : -1, 'error' : 'timeout'}
@@ -165,8 +183,9 @@ async def stop(params : StopParam):
             await asyncio.sleep(1)
             time_tick += 1
             try:
-                reader, writer = await asyncio.open_connection ('192.168.1.2'
-                                                                , 8081, ssl=False)
+                reader, writer = await asyncio.open_connection (appRpcIp
+                                                                , appRpcPort
+                                                                , ssl=False)
 
                 writer.write("stop".encode())
                 await writer.drain()
