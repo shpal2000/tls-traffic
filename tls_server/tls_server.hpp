@@ -22,6 +22,7 @@ public:
         m_srv_cert = jcfg["srv_cert"].get<std::string>().c_str();
         m_srv_key = jcfg["srv_key"].get<std::string>().c_str();
         m_cipher = jcfg["cipher"].get<std::string>().c_str();
+        m_session_resumption = jcfg["session_resumption"].get<int>();
 
         const char* tls_version 
             = jcfg["tls_version"].get<std::string>().c_str();
@@ -114,6 +115,8 @@ public:
     int m_read_buffer_len;
     int m_write_buffer_len;
 
+    int m_session_resumption;
+
     std::string m_srv_cert;
     std::string m_srv_key;
     std::string m_cipher;
@@ -175,7 +178,18 @@ public:
 
             SSL_CTX_set_mode(ssl_ctx, SSL_MODE_ENABLE_PARTIAL_WRITE);
 
-            SSL_CTX_set_session_cache_mode(ssl_ctx, SSL_SESS_CACHE_OFF);
+
+            if (m_session_resumption){
+                SSL_CTX_set_session_cache_mode(ssl_ctx
+                                                , SSL_SESS_CACHE_SERVER);
+            } else {
+                SSL_CTX_set_session_cache_mode(ssl_ctx
+                                                , SSL_SESS_CACHE_OFF);
+            }
+
+            SSL_CTX_set_session_id_context(ssl_ctx
+                                                , (unsigned char*)this
+                                                , sizeof(void*)); 
 
             SSL_CTX_set1_groups_list(ssl_ctx, "P-521:P-384:P-256");
 

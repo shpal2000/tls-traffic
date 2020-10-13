@@ -17,6 +17,7 @@ public:
         m_cs_start_tls_len = jcfg["cs_start_tls_len"].get<int>();
         m_sc_start_tls_len = jcfg["sc_start_tls_len"].get<int>();
         m_cipher = jcfg["cipher"].get<std::string>().c_str();
+        m_session_resumption = jcfg["session_resumption"].get<int>();
 
         const char* tls_version = jcfg["tls_version"].get<std::string>().c_str();
 
@@ -81,6 +82,9 @@ public:
     int m_sc_data_len;
     int m_cs_start_tls_len;
     int m_sc_start_tls_len;
+
+    int m_session_resumption;
+    std::queue<SSL_SESSION*> m_sess_list;
 
     int m_write_chunk;
     char* m_read_buffer;

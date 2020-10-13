@@ -83,12 +83,16 @@ tls_client_app::tls_client_app(json app_json
         SSL_CTX_set_mode(next_cs_grp->m_ssl_ctx, SSL_MODE_ENABLE_PARTIAL_WRITE);
 
         SSL_CTX_set_session_cache_mode(next_cs_grp->m_ssl_ctx
-                                            , SSL_SESS_CACHE_OFF);
+                                                , SSL_SESS_CACHE_OFF);
         
         status = SSL_CTX_set1_groups_list(next_cs_grp->m_ssl_ctx
                                             , "P-521:P-384:P-256");
 
         SSL_CTX_set_dh_auto(next_cs_grp->m_ssl_ctx, 1);
+
+        SSL_CTX_set_session_id_context(next_cs_grp->m_ssl_ctx
+                                    , (unsigned char*)next_cs_grp
+                                    , sizeof(void*));
 
         m_cs_groups.push_back (next_cs_grp);
 
@@ -166,6 +170,18 @@ void tls_client_socket::ssl_init ()
 {
     m_ssl = SSL_new (m_cs_grp->m_ssl_ctx);
     if (m_ssl){
+        if (m_cs_grp->m_sess_list.empty() == false){
+            SSL_SESSION* session = m_cs_grp->m_sess_list.front();
+            m_cs_grp->m_sess_list.pop();
+            int ret = SSL_set_session (m_ssl, session);
+
+            if (ret == 0){
+                unsigned long err_l = ERR_get_error();
+                char* err_s = ERR_error_string(err_l, NULL);
+                printf("%s", err_s);
+            }
+        }
+
         SSL_set_tlsext_host_name (m_ssl, "www.google.com");
         set_as_ssl_client (m_ssl);
     } else {
@@ -313,6 +329,9 @@ void tls_client_socket::on_rstatus (int bytes_read, int read_status)
 void tls_client_socket::on_finish ()
 {
         if (m_ssl) {
+            if (m_cs_grp->m_session_resumption){
+                m_cs_grp->m_sess_list.push(SSL_get1_session(m_ssl));
+            }
             SSL_free (m_ssl);
             m_ssl = nullptr;
         }

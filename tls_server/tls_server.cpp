@@ -102,7 +102,7 @@ void tls_server_socket::ssl_init ()
         }
     }
 
-    if (m_ssl){
+    if (m_ssl){      
         set_as_ssl_server (m_ssl);
     } else {
         //stats
