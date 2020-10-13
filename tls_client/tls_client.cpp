@@ -176,9 +176,7 @@ void tls_client_socket::ssl_init ()
             int ret = SSL_set_session (m_ssl, session);
 
             if (ret == 0){
-                unsigned long err_l = ERR_get_error();
-                char* err_s = ERR_error_string(err_l, NULL);
-                printf("%s", err_s);
+                // todo
             }
         }
 
@@ -330,7 +328,18 @@ void tls_client_socket::on_finish ()
 {
         if (m_ssl) {
             if (m_cs_grp->m_session_resumption){
-                m_cs_grp->m_sess_list.push(SSL_get1_session(m_ssl));
+                SSL_SESSION* sess = SSL_get1_session(m_ssl);
+                if (m_cs_grp->m_sess_cache.find(sess) == m_cs_grp->m_sess_cache.end()){
+                    m_cs_grp->m_sess_cache.insert({sess, 0});
+                    m_cs_grp->m_sess_list.push(sess);
+                } else {
+                    if (m_cs_grp->m_sess_cache[sess] == 4){
+                        m_cs_grp->m_sess_cache.erase(sess);
+                    } else {
+                        m_cs_grp->m_sess_cache[sess] = m_cs_grp->m_sess_cache[sess] + 1;
+                        m_cs_grp->m_sess_list.push(sess);
+                    }
+                }
             }
             SSL_free (m_ssl);
             m_ssl = nullptr;

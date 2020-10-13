@@ -85,6 +85,7 @@ public:
 
     int m_session_resumption;
     std::queue<SSL_SESSION*> m_sess_list;
+    std::unordered_map<SSL_SESSION*, int> m_sess_cache;
 
     int m_write_chunk;
     char* m_read_buffer;
