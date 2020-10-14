@@ -328,16 +328,18 @@ void tls_client_socket::on_finish ()
 {
         if (m_ssl) {
             if (m_cs_grp->m_session_resumption){
-                SSL_SESSION* sess = SSL_get1_session(m_ssl);
+                SSL_SESSION* sess = SSL_get0_session(m_ssl);
                 if (m_cs_grp->m_sess_cache.find(sess) == m_cs_grp->m_sess_cache.end()){
                     m_cs_grp->m_sess_cache.insert({sess, 0});
                     m_cs_grp->m_sess_list.push(sess);
+                    SSL_SESSION_up_ref(sess);
                 } else {
                     if (m_cs_grp->m_sess_cache[sess] == 4){
                         m_cs_grp->m_sess_cache.erase(sess);
                     } else {
                         m_cs_grp->m_sess_cache[sess] = m_cs_grp->m_sess_cache[sess] + 1;
                         m_cs_grp->m_sess_list.push(sess);
+                        SSL_SESSION_up_ref(sess);
                     }
                 }
             }
