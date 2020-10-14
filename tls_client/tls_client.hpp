@@ -152,6 +152,7 @@ public:
         m_bytes_read = 0;
         m_ssl = nullptr;
         m_ssl_init = false;
+        m_old_sess = nullptr;
     };
 
     virtual ~tls_client_socket()
@@ -175,6 +176,7 @@ public:
     int m_bytes_written;
     int m_bytes_read;
     bool m_ssl_init;
+    SSL_SESSION* m_old_sess;
 };
 
 #endif
