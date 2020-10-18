@@ -200,9 +200,11 @@ async def stop(params : StopParam):
             except:
                 pass
 
-    cmd_str = "kill $(ps aux | grep '[{}]{}' | awk '{print $2}')".format( \
+    awk_exp = "'{print $2}'"
+    cmd_str = "kill $(ps aux | grep '[{}]{}' | awk {})".format( \
                                                             params.exe_alias[0],
-                                                            params.exe_alias[1:])    
+                                                            params.exe_alias[1:],
+                                                            awk_exp)    
     os.system (cmd_str)
 
     cmd_str = "ip netns exec ns-tool ip link set veth2 netns 1"
