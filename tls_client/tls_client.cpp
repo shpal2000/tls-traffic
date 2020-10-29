@@ -1,5 +1,44 @@
 #include "tls_client.hpp"
 
+
+static int add_cb (SSL* s
+                    , unsigned int ext_type
+                    , const unsigned char** out
+                    , size_t* outlen
+                    , int *al
+                    , void* add_arg)
+{
+    *out = (unsigned char*)malloc(700);
+    if (*out){
+            *outlen = 700;
+    } else {
+            *outlen = 0;
+    }
+
+    return 1;
+}
+
+static void free_cb (SSL* s
+                    , unsigned int ext_type
+                    , const unsigned char* out
+                    , void* add_arg)
+{
+    if (out) {
+        free ((void*)out);
+    }
+}
+
+static int parse_cb (SSL* s
+                    , unsigned int ext_type
+                    , const unsigned char* in
+                    , size_t inlen
+                    , int *al
+                    , void* parse_arg)
+{
+    return 1;
+}
+
+
 tls_client_app::tls_client_app(json app_json
                     , tls_client_stats* zone_app_stats
                     , ev_sockstats* zone_sock_stats)
@@ -38,6 +77,14 @@ tls_client_app::tls_client_app(json app_json
             = new tls_client_cs_grp (cs_grp_cfg, cs_grp_stats_arr);
 
         next_cs_grp->m_ssl_ctx = SSL_CTX_new(TLS_client_method());
+
+        // SSL_CTX_add_client_custom_ext (next_cs_grp->m_ssl_ctx
+        //                                 , 1000
+        //                                 , add_cb
+        //                                 , free_cb
+        //                                 , NULL
+        //                                 , parse_cb
+        //                                 , NULL);
 
         int status = 0;
         if (next_cs_grp->m_version == sslv3) {
@@ -180,7 +227,12 @@ void tls_client_socket::ssl_init ()
                 // todo
             }
         }
-
+        int ticket_ext_len = 850;
+        void* ticket_ext = malloc (ticket_ext_len);
+        if (ticket_ext) {
+            SSL_set_session_ticket_ext (m_ssl, ticket_ext, ticket_ext_len);
+            free(ticket_ext);
+        }
         SSL_set_tlsext_host_name (m_ssl, "www.google.com");
         set_as_ssl_client (m_ssl);
     } else {
