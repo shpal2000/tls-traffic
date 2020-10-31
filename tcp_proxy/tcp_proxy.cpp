@@ -13,8 +13,8 @@ tcp_proxy_app::tcp_proxy_app(json app_json
     {
         auto proxy_cfg = it.value ();
 
-        const char* proxy_label 
-            = proxy_cfg["proxy_label"].get<std::string>().c_str();
+        auto proxy_label 
+            = proxy_cfg["proxy_label"].get<std::string>();
         
         int proxy_enable = proxy_cfg["enable"].get<int>();
         if (proxy_enable == 0) {
@@ -22,7 +22,7 @@ tcp_proxy_app::tcp_proxy_app(json app_json
         }
 
         tcp_proxy_stats* proxy_stats = new tcp_proxy_stats();
-        set_app_stats (proxy_stats, proxy_label);
+        set_app_stats (proxy_stats, proxy_label.c_str());
 
         std::vector<ev_sockstats*> *proxy_stats_arr
             = new std::vector<ev_sockstats*> ();

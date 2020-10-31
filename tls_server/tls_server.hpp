@@ -19,17 +19,17 @@ public:
         m_sc_data_len = jcfg["sc_data_len"].get<int>();
         m_cs_start_tls_len = jcfg["cs_start_tls_len"].get<int>();
         m_sc_start_tls_len = jcfg["sc_start_tls_len"].get<int>();
-        m_srv_cert = jcfg["srv_cert"].get<std::string>().c_str();
-        m_srv_key = jcfg["srv_key"].get<std::string>().c_str();
-        m_cipher = jcfg["cipher"].get<std::string>().c_str();
+        m_srv_cert = jcfg["srv_cert"].get<std::string>();
+        m_srv_key = jcfg["srv_key"].get<std::string>();
+        m_cipher = jcfg["cipher"].get<std::string>();
         m_session_resumption = jcfg["session_resumption"].get<int>();
 
-        const char* tls_version 
-            = jcfg["tls_version"].get<std::string>().c_str();
-        const char* close_type 
-            = jcfg["close_type"].get<std::string>().c_str();
-        const char* close_notify 
-            = jcfg["close_notify"].get<std::string>().c_str();
+        auto tls_version 
+            = jcfg["tls_version"].get<std::string>();
+        auto close_type 
+            = jcfg["close_type"].get<std::string>();
+        auto close_notify 
+            = jcfg["close_notify"].get<std::string>();
 
         m_write_chunk = jcfg["write_chunk"].get<int>();
         if (m_write_chunk == 0){
@@ -48,42 +48,42 @@ public:
         }
         m_read_buffer = (char*) malloc (m_read_buffer_len);
        
-        if (strcmp(close_type, "fin") == 0) {
+        if (strcmp(close_type.c_str(), "fin") == 0) {
             m_close = close_fin;
-        } else if (strcmp(close_type, "reset") == 0) {
+        } else if (strcmp(close_type.c_str(), "reset") == 0) {
             m_close = close_reset;
         }else {
             m_close = close_fin;
         }
 
-        if (strcmp(close_notify, "send") == 0) {
+        if (strcmp(close_notify.c_str(), "send") == 0) {
             m_close_notify = close_notify_send;
-        } else if (strcmp(close_notify, "send_recv") == 0) {
+        } else if (strcmp(close_notify.c_str(), "send_recv") == 0) {
             m_close_notify = close_notify_send_recv;
-        } else if (strcmp(close_notify, "no_send") == 0)  {
+        } else if (strcmp(close_notify.c_str(), "no_send") == 0)  {
             m_close_notify = close_notify_no_send;
         } else {
             m_close_notify = close_notify_send_recv;
         }
 
-        if (strcmp(tls_version, "sslv3") == 0){
+        if (strcmp(tls_version.c_str(), "sslv3") == 0){
             m_version = sslv3;
-        } else if (strcmp(tls_version, "tls1") == 0){
+        } else if (strcmp(tls_version.c_str(), "tls1") == 0){
             m_version = tls1;
-        } else if (strcmp(tls_version, "tls1_1") == 0){
+        } else if (strcmp(tls_version.c_str(), "tls1_1") == 0){
             m_version = tls1_1;
-        } else if (strcmp(tls_version, "tls1_2") == 0){
+        } else if (strcmp(tls_version.c_str(), "tls1_2") == 0){
             m_version = tls1_2;
-        } else if (strcmp(tls_version, "tls1_3") == 0){
+        } else if (strcmp(tls_version.c_str(), "tls1_3") == 0){
             m_version = tls1_3;
-        } else if (strcmp(tls_version, "tls_all") == 0){
+        } else if (strcmp(tls_version.c_str(), "tls_all") == 0){
             m_version = tls_all;
         } else {
             m_version = tls_all;
         }
 
         if (m_version == tls_all) {
-            m_cipher2 = jcfg["cipher2"].get<std::string>().c_str();
+            m_cipher2 = jcfg["cipher2"].get<std::string>();
         }
         else
         {

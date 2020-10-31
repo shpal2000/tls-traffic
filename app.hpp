@@ -141,10 +141,10 @@ public:
                                                 : ev_app_conn_grp (jcfg)
     {
 
-        const char* srv_ip = jcfg["srv_ip"].get<std::string>().c_str();
+        auto srv_ip = jcfg["srv_ip"].get<std::string>();
         u_short srv_port = jcfg["srv_port"].get<u_short>();
-        const char* ip_begin = jcfg["clnt_ip_begin"].get<std::string>().c_str();
-        const char* ip_end = jcfg["clnt_ip_end"].get<std::string>().c_str();
+        auto ip_begin = jcfg["clnt_ip_begin"].get<std::string>();
+        auto ip_end = jcfg["clnt_ip_end"].get<std::string>();
         u_short port_begin = jcfg["clnt_port_begin"].get<u_short>();
         u_short port_end = jcfg["clnt_port_end"].get<u_short>();
 
@@ -152,13 +152,13 @@ public:
         m_clnt_addr_count = 0;
 
         char next_ip[128];
-        strcpy (next_ip, ip_begin);
+        strcpy (next_ip, ip_begin.c_str());
         ev_sockaddrx* next_addr = new ev_sockaddrx (port_begin, port_end);
         ev_socket::set_sockaddr (&next_addr->m_addr, next_ip, 0);
         m_clnt_addr_pool.push_back(next_addr);
         m_clnt_addr_count++;
 
-        while (strcmp(next_ip, ip_end))
+        while (strcmp(next_ip, ip_end.c_str()))
         {
             next_addr = new ev_sockaddrx (port_begin, port_end);
             ev_socket::get_nextip_str (next_ip, 1, next_ip);
@@ -167,7 +167,7 @@ public:
             m_clnt_addr_count++;
         }
 
-        ev_socket::set_sockaddr (&m_srvr_addr, srv_ip, htons(srv_port));
+        ev_socket::set_sockaddr (&m_srvr_addr, srv_ip.c_str(), htons(srv_port));
 
         m_stats_arr = stats_arr;
     }
@@ -208,9 +208,9 @@ public:
     ev_app_srv_grp (json jcfg, std::vector<ev_sockstats*> *stats_arr)
                                                 : ev_app_conn_grp (jcfg)
     {
-        const char* srv_ip = jcfg["srv_ip"].get<std::string>().c_str();
+        auto srv_ip = jcfg["srv_ip"].get<std::string>();
         u_short srv_port = jcfg["srv_port"].get<u_short>();
-        ev_socket::set_sockaddr (&m_srvr_addr, srv_ip, htons(srv_port));
+        ev_socket::set_sockaddr (&m_srvr_addr, srv_ip.c_str(), htons(srv_port));
         m_stats_arr = stats_arr;
     }
 };
@@ -226,9 +226,9 @@ public:
     ev_app_proxy_grp (json jcfg, std::vector<ev_sockstats*> *stats_arr)
                                                 : ev_app_conn_grp (jcfg)
     {
-        const char* proxy_ip = jcfg["proxy_ip"].get<std::string>().c_str();
+        auto proxy_ip = jcfg["proxy_ip"].get<std::string>();
         u_short proxy_port = jcfg["proxy_port"].get<u_short>();
-        ev_socket::set_sockaddr (&m_proxy_addr, proxy_ip, htons(proxy_port));
+        ev_socket::set_sockaddr (&m_proxy_addr, proxy_ip.c_str(), htons(proxy_port));
 
         m_stats_arr = stats_arr;
 

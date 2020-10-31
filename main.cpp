@@ -10,7 +10,7 @@
 rpc_server_stats* zone_rpc_server_stats = nullptr;
 app_stats* zone_ev_sockstats = nullptr;
 
-static std::vector<app*>* create_app_list (json cfg_json, int z_index)
+static std::vector<app*>* create_app_list (json &cfg_json, int z_index)
 {
     std::vector<app*> *app_list = nullptr;
 
@@ -32,18 +32,18 @@ static std::vector<app*>* create_app_list (json cfg_json, int z_index)
         }
 
         app* next_app = nullptr;
-        const char* app_type = app_json["app_type"].get<std::string>().c_str();
-        const char* app_lib = app_json["app_lib"].get<std::string>().c_str();
-        const char* app_label = app_json["app_label"].get<std::string>().c_str();
+        auto app_type = app_json["app_type"].get<std::string>();
+        auto app_lib = app_json["app_lib"].get<std::string>();
+        auto app_label = app_json["app_label"].get<std::string>();
 
         if (app_factory.find(app_type) == app_factory.end()) {
-            void* dlib = dlopen (app_lib, RTLD_NOW);
-            app_factory [app_type] = (app_maker_t) dlsym (dlib, app_type);
+            void* dlib = dlopen (app_lib.c_str(), RTLD_NOW);
+            app_factory [app_type] = (app_maker_t) dlsym (dlib, app_type.c_str());
         }
 
         next_app = app_factory [app_type](app_json, zone_ev_sockstats);
-        next_app->set_app_type (app_type);
-        next_app->set_app_label (app_label);
+        next_app->set_app_type (app_type.c_str());
+        next_app->set_app_label (app_label.c_str());
 
         if (app_list == nullptr)
         {

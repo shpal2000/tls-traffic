@@ -54,8 +54,8 @@ tls_client_app::tls_client_app(json app_json
     {
         auto cs_grp_cfg = it.value ();
 
-        const char* cs_grp_label 
-            = cs_grp_cfg["cs_grp_label"].get<std::string>().c_str();
+        auto cs_grp_label 
+            = cs_grp_cfg["cs_grp_label"].get<std::string>();
 
         int cs_grp_enable = cs_grp_cfg["enable"].get<int>();
         if (cs_grp_enable == 0) {
@@ -63,7 +63,7 @@ tls_client_app::tls_client_app(json app_json
         }
 
         tls_client_stats* cs_grp_stats = new tls_client_stats();
-        set_app_stats (cs_grp_stats, cs_grp_label);
+        set_app_stats (cs_grp_stats, cs_grp_label.c_str());
 
         std::vector<ev_sockstats*> *cs_grp_stats_arr 
             = new std::vector<ev_sockstats*> ();
@@ -111,7 +111,7 @@ tls_client_app::tls_client_app(json app_json
         }
 
         if (next_cs_grp->m_version == tls_all) {
-            next_cs_grp->m_cipher2 = cs_grp_cfg["cipher2"].get<std::string>().c_str();
+            next_cs_grp->m_cipher2 = cs_grp_cfg["cipher2"].get<std::string>();
             SSL_CTX_set_ciphersuites (next_cs_grp->m_ssl_ctx
                                         , next_cs_grp->m_cipher2.c_str());
             SSL_CTX_set_cipher_list (next_cs_grp->m_ssl_ctx

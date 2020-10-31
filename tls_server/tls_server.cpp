@@ -14,8 +14,7 @@ tls_server_app::tls_server_app(json app_json
     {
         auto srv_cfg = it.value ();
 
-        const char* srv_label 
-            = srv_cfg["srv_label"].get<std::string>().c_str();
+        auto srv_label = srv_cfg["srv_label"].get<std::string>();
         
         int srv_enable = srv_cfg["enable"].get<int>();
         if (srv_enable == 0) {
@@ -23,7 +22,7 @@ tls_server_app::tls_server_app(json app_json
         }
 
         tls_server_stats* srv_stats = new tls_server_stats();
-        set_app_stats (srv_stats, srv_label);
+        set_app_stats (srv_stats, srv_label.c_str());
 
         std::vector<ev_sockstats*> *srv_stats_arr
             = new std::vector<ev_sockstats*> ();
