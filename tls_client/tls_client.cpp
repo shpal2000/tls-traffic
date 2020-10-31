@@ -40,7 +40,7 @@ static int parse_cb (SSL* s
 
 
 tls_client_app::tls_client_app(json app_json
-                    , tls_client_stats* zone_app_stats
+                    // , tls_client_stats* zone_app_stats
                     , ev_sockstats* zone_sock_stats)
 {
     client_config_init (app_json);
@@ -70,7 +70,7 @@ tls_client_app::tls_client_app(json app_json
 
         cs_grp_stats_arr->push_back (cs_grp_stats);
         cs_grp_stats_arr->push_back (m_app_stats);
-        cs_grp_stats_arr->push_back (zone_app_stats);
+        // cs_grp_stats_arr->push_back (zone_app_stats);
         cs_grp_stats_arr->push_back (zone_sock_stats);
 
         tls_client_cs_grp* next_cs_grp 
@@ -417,4 +417,11 @@ void tls_client_socket::on_finish ()
             SSL_free (m_ssl);
             m_ssl = nullptr;
         }
+}
+
+extern "C" {
+    app* tls_client (json app_json, ev_sockstats* zone_sock_stats) 
+    {
+        return new tls_client_app (app_json, zone_sock_stats);
+    }
 }

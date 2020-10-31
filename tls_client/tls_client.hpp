@@ -127,7 +127,7 @@ class tls_client_app : public app
 {
 public:
     tls_client_app(json app_json
-                    , tls_client_stats* all_app_stats
+                    // , tls_client_stats* all_app_stats
                     , ev_sockstats* all_ev_app_stats);
 
     ~tls_client_app();

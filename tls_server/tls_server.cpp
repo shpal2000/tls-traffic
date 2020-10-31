@@ -2,7 +2,7 @@
 
 
 tls_server_app::tls_server_app(json app_json
-                                , tls_server_stats* zone_app_stats
+                                // , tls_server_stats* zone_app_stats
                                 , ev_sockstats* zone_sock_stats)
 {
     server_config_init (app_json);
@@ -30,7 +30,7 @@ tls_server_app::tls_server_app(json app_json
 
         srv_stats_arr->push_back (srv_stats);
         srv_stats_arr->push_back (m_app_stats);
-        srv_stats_arr->push_back (zone_app_stats);
+        // srv_stats_arr->push_back (zone_app_stats);
         srv_stats_arr->push_back (zone_sock_stats);
 
 
@@ -258,5 +258,12 @@ void tls_server_socket::on_finish ()
     if (m_ssl_ctx) {
         SSL_CTX_free (m_ssl_ctx);
         m_ssl_ctx = nullptr;
+    }
+}
+
+extern "C" {
+    app* tls_server (json app_json, ev_sockstats* zone_sock_stats) 
+    {
+        return new tls_server_app (app_json, zone_sock_stats);
     }
 }

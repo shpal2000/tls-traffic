@@ -4,22 +4,17 @@
 #include <sstream>
 #include <signal.h>
 #include <chrono>
+#include <dlfcn.h>
 
 #include "./rpc_server/rpc_server.hpp"
-
-#include "./tls_server/tls_server.hpp"
-#include "./tls_client/tls_client.hpp"
-#include "./tcp_proxy/tcp_proxy.hpp"
-
-app_stats* zone_ev_sockstats = nullptr;
 rpc_server_stats* zone_rpc_server_stats = nullptr;
-tls_server_stats* zone_tls_server_stats = nullptr;
-tls_client_stats* zone_tls_client_stats = nullptr;
-tcp_proxy_stats* zone_tcp_proxy_stats = nullptr;
+app_stats* zone_ev_sockstats = nullptr;
 
 static std::vector<app*>* create_app_list (json cfg_json, int z_index)
 {
     std::vector<app*> *app_list = nullptr;
+
+    std::map<std::string, app_maker_t> app_factory;
 
     auto a_list = cfg_json["zones"][z_index]["app_list"];
     for (auto a_it = a_list.begin(); a_it != a_list.end(); ++a_it)
@@ -38,60 +33,25 @@ static std::vector<app*>* create_app_list (json cfg_json, int z_index)
 
         app* next_app = nullptr;
         const char* app_type = app_json["app_type"].get<std::string>().c_str();
+        const char* app_lib = app_json["app_lib"].get<std::string>().c_str();
         const char* app_label = app_json["app_label"].get<std::string>().c_str();
 
-        if ( strcmp("tls_server", app_type) == 0 )
-        {
-            if (zone_tls_server_stats == nullptr)
-            {
-                zone_tls_server_stats = new tls_server_stats ();
-            }
-
-            next_app = new tls_server_app (app_json
-                                            , zone_tls_server_stats
-                                            , zone_ev_sockstats);
-
-        }
-        else if ( strcmp("tls_client", app_type) == 0 )
-        {
-            if (zone_tls_client_stats == nullptr)
-            {
-                zone_tls_client_stats = new tls_client_stats ();
-            }
-            
-            next_app = new tls_client_app (app_json
-                                            , zone_tls_client_stats
-                                            , zone_ev_sockstats);
-        }
-        else if ( strcmp("tcp_proxy", app_type) == 0 )
-        {
-            if (zone_tcp_proxy_stats == nullptr)
-            {
-                zone_tcp_proxy_stats = new tcp_proxy_stats ();
-            }
-            
-            next_app = new tcp_proxy_app (app_json
-                                            , zone_tcp_proxy_stats
-                                            , zone_ev_sockstats);
+        if (app_factory.find(app_type) == app_factory.end()) {
+            void* dlib = dlopen (app_lib, RTLD_NOW);
+            app_factory [app_type] = (app_maker_t) dlsym (dlib, app_type);
         }
 
-        if (next_app)
-        {
-            next_app->set_app_type (app_type);
-            next_app->set_app_label (app_label);
+        next_app = app_factory [app_type](app_json, zone_ev_sockstats);
+        next_app->set_app_type (app_type);
+        next_app->set_app_label (app_label);
 
-            if (app_list == nullptr)
-            {
-                app_list = new std::vector<app*>;
-            }
-
-            app_list->push_back (next_app);
-        }
-        else
+        if (app_list == nullptr)
         {
-            printf ("unknown app_type %s\n", app_type);
-            exit (-1);
+            app_list = new std::vector<app*>;
         }
+
+        app_list->push_back (next_app);
+
     }
 
     return app_list;

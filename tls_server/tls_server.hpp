@@ -269,7 +269,7 @@ class tls_server_app : public app
 {
 public:
     tls_server_app(json app_json
-                    , tls_server_stats* all_app_stats
+                    // , tls_server_stats* all_app_stats
                     , ev_sockstats* all_ev_app_stats);
 
     ~tls_server_app();

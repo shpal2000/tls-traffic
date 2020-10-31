@@ -376,4 +376,5 @@ protected:
     app_stats* m_app_stats;
 };
 
+typedef app* (*app_maker_t) (json, ev_sockstats*);
 #endif

@@ -1,22 +1,18 @@
-project('tlspack', 'cpp',
-  version : '1.0',
-  default_options : ['warning_level=3'
-                      , 'cpp_std=c++17'])
+libdl = meson.get_compiler('cpp').find_library('dl', required : true)
 
 openssl = dependency('openssl')
 nlohmann_json_proj = subproject('json')
 nlohmann_json_dep = nlohmann_json_proj.get_variable('nlohmann_json_dep')
 incdirs = include_directories(['../tlspack-socket/'])
 
+subdir ('tls_client')
+subdir ('tls_server')
+subdir ('rpc_server')
+
 executable('tlspack.exe'
-            , sources : [ '../tlspack-socket/ev_socket.cpp'
-                          , '../tlspack-socket/ev_app.cpp'
-                          , './tls_server/tls_server.cpp'
-                          , './tls_client/tls_client.cpp'
-                          , './rpc_server/rpc_server.cpp'
-                          , './tcp_proxy/tcp_proxy.cpp'
-                          , 'main.cpp' ]
-            , dependencies: [openssl, nlohmann_json_dep]
+            , sources : [ 'main.cpp', 'app.cpp' ]
+            , dependencies: [openssl, nlohmann_json_dep, libdl]
             , include_directories : [incdirs]
-            , install : true)
+            , link_with : [ev_socklib, rpc_serverlib]
+            , install : false)
 
