@@ -221,6 +221,7 @@ void tls_client_socket::ssl_init ()
             SSL_SESSION* session = m_cs_grp->m_sess_list.front();
             m_cs_grp->m_sess_list.pop();
             int ret = SSL_set_session (m_ssl, session);
+            inc_t_stats(sslResumptionInit);
             m_old_sess = session;
 
             if (ret == 0){
@@ -389,6 +390,8 @@ void tls_client_socket::on_finish ()
                 }
 
                 if (SSL_session_reused(m_ssl)) {
+                    inc_t_stats(sslResumptionInitHit);
+
                     // resumed session
                     sess_reused += 1;
                     if (sess_reused == 4) { 

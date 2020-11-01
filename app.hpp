@@ -39,6 +39,14 @@ enum enum_tls_version { sslv3=0, tls1, tls1_1, tls1_2, tls1_3, tls_all};
 
 struct app_stats : public ev_sockstats
 {
+    uint64_t sslResumptionInit;
+    uint64_t sslResumptionInitHit;
+    uint64_t sslResumptionInitMiss;
+
+    uint64_t sslResumptionRecv;
+    uint64_t sslResumptionRecvHit;
+    uint64_t sslResumptionRecvMiss;
+
     static void dump_json_ev_sockstats (json& j, ev_sockstats* stats)
     {
         j["socketCreate"] = stats->socketCreate;
@@ -108,6 +116,15 @@ struct app_stats : public ev_sockstats
     virtual void dump_json (json& j)
     {
         dump_json_ev_sockstats (j, this);
+
+        j["sslResumptionInit"] = sslResumptionInit;
+        j["sslResumptionInitHit"] = sslResumptionInitHit;
+        j["sslResumptionInitMiss"] = sslResumptionInitMiss;
+
+        j["sslResumptionRecv"] = sslResumptionRecv;
+        j["sslResumptionRecvHit"] = sslResumptionRecvHit;
+        j["sslResumptionRecvMiss"] = sslResumptionRecvMiss;
+
     };
 
 };
@@ -377,4 +394,15 @@ protected:
 };
 
 typedef app* (*app_maker_t) (json, ev_sockstats*);
+
+#define inc_t_stats(__stat_name) \
+{ \
+    inc_app_stats(this,app_stats,__stat_name); \
+}
+
+#define dec_t_stats(__stat_name) \
+{ \
+    dec_app_stats(this,app_stats,__stat_name); \
+}
+
 #endif

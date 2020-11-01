@@ -322,9 +322,4 @@ private:
     bool m_ssl_init;
 };
 
-#define inc_tls_server_stats(__stat_name) \
-{ \
-    inc_app_stats(ev_sock,tls_server_stats,__stat_name); \
-}
-
 #endif
