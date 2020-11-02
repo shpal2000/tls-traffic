@@ -7,10 +7,10 @@
 #define DEFAULT_WRITE_BUFF_LEN 1000000
 #define DEFAULT_READ_BUFF_LEN 1000000
 
-class tls_server_srv_grp : public ev_app_srv_grp 
+class tls_server_perf_srv_grp : public ev_app_srv_grp 
 {
 public:
-    tls_server_srv_grp (json jcfg
+    tls_server_perf_srv_grp (json jcfg
                         , app_stats* parent_stats, app_stats* zone_stats) 
                         : ev_app_srv_grp (jcfg, parent_stats, zone_stats) 
     {
@@ -88,20 +88,6 @@ public:
         {
             m_cipher2 = "";
         }
-
-        m_emulation_id = 0;
-        m_next_cert_index = 1;
-        m_max_cert_index = 1;
-        
-        try
-        {
-            m_emulation_id = jcfg["emulation_id"].get<int>();
-            m_next_cert_index = jcfg["begin_cert_index"].get<int>();
-            m_max_cert_index = jcfg["end_cert_index"].get<int>();
-        }
-        catch(const std::exception& e)
-        {
-        }
     }
 
     int m_cs_data_len;
@@ -123,13 +109,6 @@ public:
     enum_close_type m_close;
     enum_close_notify m_close_notify;
     enum_tls_version m_version;
-
-    int m_emulation_id;
-    int m_next_cert_index;
-    int m_max_cert_index;
-
-    char m_next_cert [1024];
-    char m_next_key [1024];
 
     SSL_CTX* m_ssl_ctx;
 
@@ -196,20 +175,8 @@ public:
 
             const char* server_cert;
             const char* server_key;
-
-            if (m_emulation_id == 0){
-                server_cert = m_srv_cert.c_str();
-                server_key = m_srv_key.c_str();
-            }else{
-                sprintf (m_next_cert, "/rundir/certs/server%d.cert", m_next_cert_index);
-                sprintf (m_next_key, "/rundir/certs/server%d.key", m_next_cert_index);
-                server_cert = m_next_cert;
-                server_key = m_next_key;
-                m_next_cert_index++;
-                if (m_next_cert_index > m_max_cert_index){
-                    m_next_cert_index = 1;
-                }
-            }
+            server_cert = m_srv_cert.c_str();
+            server_key = m_srv_key.c_str();
 
             std::ifstream f(server_cert);
             std::ostringstream ss;
@@ -244,13 +211,13 @@ public:
     }
 };
 
-class tls_server_app : public app
+class tls_server_perf_app : public app
 {
 public:
-    tls_server_app(json app_json
+    tls_server_perf_app(json app_json
                     , app_stats* zone_app_stats);
 
-    ~tls_server_app();
+    ~tls_server_perf_app();
 
     void run_iter(bool tick_sec);
 
@@ -258,13 +225,13 @@ public:
     void free_socket(ev_socket* ev_sock);
 
 public:
-    std::vector<tls_server_srv_grp*> m_srv_groups;
+    std::vector<tls_server_perf_srv_grp*> m_srv_groups;
 };
 
-class tls_server_socket : public ev_socket
+class tls_server_perf_socket : public ev_socket
 {
 public:
-    tls_server_socket()
+    tls_server_perf_socket()
     {
         m_bytes_written = 0;
         m_bytes_read = 0;
@@ -273,7 +240,7 @@ public:
         m_ssl_init = false;
     };
 
-    virtual ~tls_server_socket()
+    virtual ~tls_server_perf_socket()
     {
 
     };
@@ -288,9 +255,9 @@ public:
     void on_finish ();
 
 public:
-    tls_server_srv_grp* m_srv_grp;
-    tls_server_app* m_app;
-    tls_server_socket* m_lsock;
+    tls_server_perf_srv_grp* m_srv_grp;
+    tls_server_perf_app* m_app;
+    tls_server_perf_socket* m_lsock;
     SSL* m_ssl;
     int m_bytes_written;
     int m_bytes_read;

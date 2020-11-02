@@ -5,15 +5,10 @@
 
 struct rpc_server_stats_data : app_stats
 {
-    uint64_t rpc_server_stats_1;
-    uint64_t rpc_server_stats_100;
-
     virtual void dump_json (json &j)
     {
         app_stats::dump_json (j);
         
-        j["rpc_server_stats_1"] = rpc_server_stats_1;
-        j["rpc_server_stats_100"] = rpc_server_stats_100;
     }
 
     virtual ~rpc_server_stats_data() {};

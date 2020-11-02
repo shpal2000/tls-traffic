@@ -6,18 +6,19 @@
 #define DEFAULT_WRITE_BUFF_LEN 1000000
 #define DEFAULT_READ_BUFF_LEN 1000000
 
-class tls_client_cs_grp : public ev_app_cs_grp 
+class tls_client_perf_cs_grp : public ev_app_cs_grp 
 {
 public:
-    tls_client_cs_grp (json jcfg, app_stats* parent_stats, app_stats* zone_stats) 
-                                : ev_app_cs_grp (jcfg, parent_stats, zone_stats) 
+    tls_client_perf_cs_grp (json jcfg
+                            , app_stats* parent_stats
+                            , app_stats* zone_stats) 
+                            : ev_app_cs_grp (jcfg, parent_stats, zone_stats) 
     {
         m_cs_data_len = jcfg["cs_data_len"].get<int>();
         m_sc_data_len = jcfg["sc_data_len"].get<int>();
         m_cs_start_tls_len = jcfg["cs_start_tls_len"].get<int>();
         m_sc_start_tls_len = jcfg["sc_start_tls_len"].get<int>();
         m_cipher = jcfg["cipher"].get<std::string>();
-        m_session_resumption = jcfg["session_resumption"].get<int>();
 
         auto tls_version = jcfg["tls_version"].get<std::string>();
 
@@ -83,10 +84,6 @@ public:
     int m_cs_start_tls_len;
     int m_sc_start_tls_len;
 
-    int m_session_resumption;
-    std::queue<SSL_SESSION*> m_sess_list;
-    std::unordered_map<SSL_SESSION*, int> m_sess_cache;
-
     int m_write_chunk;
     char* m_read_buffer;
     char* m_write_buffer;
@@ -102,13 +99,14 @@ public:
     SSL_CTX* m_ssl_ctx;
 };
 
-class tls_client_app : public app
+
+class tls_client_perf_app : public app
 {
 public:
-    tls_client_app(json app_json
+    tls_client_perf_app(json app_json
                     , app_stats* zone_app_stats);
 
-    ~tls_client_app();
+    ~tls_client_perf_app();
 
     void run_iter(bool tick_sec);
     
@@ -116,24 +114,23 @@ public:
     void free_socket(ev_socket* ev_sock);
 
 public:
-    std::vector<tls_client_cs_grp*> m_cs_groups;
+    std::vector<tls_client_perf_cs_grp*> m_cs_groups;
     int m_cs_group_index;
     int m_cs_group_count;
 };
 
-class tls_client_socket : public ev_socket
+class tls_client_perf_socket : public ev_socket
 {
 public:
-    tls_client_socket()
+    tls_client_perf_socket()
     {
         m_bytes_written = 0;
         m_bytes_read = 0;
         m_ssl = nullptr;
         m_ssl_init = false;
-        m_old_sess = nullptr;
     };
 
-    virtual ~tls_client_socket()
+    virtual ~tls_client_perf_socket()
     {
 
     };
@@ -148,13 +145,12 @@ public:
     void on_finish ();
 
 public:
-    tls_client_cs_grp* m_cs_grp;
-    tls_client_app* m_app;
+    tls_client_perf_cs_grp* m_cs_grp;
+    tls_client_perf_app* m_app;
     SSL* m_ssl;
     int m_bytes_written;
     int m_bytes_read;
     bool m_ssl_init;
-    SSL_SESSION* m_old_sess;
 };
 
 #endif

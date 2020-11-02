@@ -7,8 +7,8 @@
 #include <dlfcn.h>
 
 #include "./rpc_server/rpc_server.hpp"
-rpc_server_stats* zone_rpc_server_stats = nullptr;
-app_stats* zone_ev_sockstats = nullptr;
+rpc_server_stats* zone_rpc_stats = nullptr;
+app_stats* zone_app_stats = nullptr;
 
 static std::vector<app*>* create_app_list (json &cfg_json, int z_index)
 {
@@ -26,9 +26,9 @@ static std::vector<app*>* create_app_list (json &cfg_json, int z_index)
             continue;
         }
 
-        if (zone_ev_sockstats == nullptr)
+        if (zone_app_stats == nullptr)
         {
-            zone_ev_sockstats = new app_stats();
+            zone_app_stats = new app_stats();
         }
 
         app* next_app = nullptr;
@@ -41,7 +41,7 @@ static std::vector<app*>* create_app_list (json &cfg_json, int z_index)
             app_factory [app_type] = (app_maker_t) dlsym (dlib, app_type.c_str());
         }
 
-        next_app = app_factory [app_type](app_json, zone_ev_sockstats);
+        next_app = app_factory [app_type](app_json, zone_app_stats);
         next_app->set_app_type (app_type.c_str());
         next_app->set_app_label (app_label.c_str());
 
@@ -104,7 +104,7 @@ public:
             strcpy (rpc_resp, "{\"cmd_resp\" : \"init_done\"}");
         } else if (strcmp(rpc_cmd, "get_ev_sockstats") == 0) {
             json j;
-            zone_ev_sockstats->dump_json(j);
+            zone_app_stats->dump_json(j);
             std::string s = j.dump();
             if (s.size() < (size_t) rpc_resp_max) {
                 strcpy (rpc_resp, s.c_str());
@@ -144,8 +144,8 @@ int main(int /*argc*/, char **argv)
 
     if ( app_list )
     {
-        zone_rpc_server_stats = new rpc_server_stats ();
-        zone_rpc = new zone_rpc_app (rpc_ip, rpc_port, zone_rpc_server_stats);
+        zone_rpc_stats = new rpc_server_stats ();
+        zone_rpc = new zone_rpc_app (rpc_ip, rpc_port, zone_rpc_stats);
 
         std::chrono::time_point<std::chrono::system_clock> start, end;
         start = std::chrono::system_clock::now();
@@ -200,7 +200,7 @@ int main(int /*argc*/, char **argv)
 
             if (is_tick_sec) 
             {
-                zone_ev_sockstats->tick_sec ();
+                zone_app_stats->tick_sec ();
 
                 is_tick_sec = false;
             }

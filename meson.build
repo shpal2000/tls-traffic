@@ -5,9 +5,14 @@ nlohmann_json_proj = subproject('json')
 nlohmann_json_dep = nlohmann_json_proj.get_variable('nlohmann_json_dep')
 incdirs = include_directories(['../tlspack-socket/'])
 
+subdir ('rpc_server')
+
 subdir ('tls_client')
 subdir ('tls_server')
-subdir ('rpc_server')
+
+subdir ('tls_client_perf')
+subdir ('tls_server_perf')
+
 
 executable('tlspack.exe'
             , sources : [ 'main.cpp', 'app.cpp' ]
