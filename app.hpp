@@ -135,10 +135,18 @@ class ev_app_conn_grp
 {
 public:
     ev_socket_opt m_sock_opt;
+    std::vector<ev_sockstats*> m_stats_arr;
+    app_stats m_grp_stats;
 
-    ev_app_conn_grp (json jcfg) {
+    app_stats* get_stats () {return &m_grp_stats;}
+    
+    ev_app_conn_grp (json jcfg, app_stats* parent_stats, app_stats* zone_stats) {
         m_sock_opt.rcv_buff_len = jcfg["tcp_rcv_buff"].get<uint32_t>();
         m_sock_opt.snd_buff_len = jcfg["tcp_snd_buff"].get<uint32_t>();
+
+        m_stats_arr.push_back (&m_grp_stats);
+        m_stats_arr.push_back (parent_stats);
+        m_stats_arr.push_back (zone_stats);
     }
 };
 
@@ -151,11 +159,9 @@ public:
     int m_clnt_addr_count;
 
     ev_sockaddr m_srvr_addr;
-    std::vector<ev_sockstats*> *m_stats_arr;
     
-
-    ev_app_cs_grp (json jcfg, std::vector<ev_sockstats*> *stats_arr)
-                                                : ev_app_conn_grp (jcfg)
+    ev_app_cs_grp (json jcfg, app_stats* parent_stats, app_stats* zone_stats)
+                            : ev_app_conn_grp (jcfg, parent_stats, zone_stats)
     {
 
         auto srv_ip = jcfg["srv_ip"].get<std::string>();
@@ -186,7 +192,6 @@ public:
 
         ev_socket::set_sockaddr (&m_srvr_addr, srv_ip.c_str(), htons(srv_port));
 
-        m_stats_arr = stats_arr;
     }
 
     ev_sockaddr* get_server_addr () {return &m_srvr_addr;};
@@ -220,15 +225,13 @@ class ev_app_srv_grp : public ev_app_conn_grp
 public:
 
     ev_sockaddr m_srvr_addr;
-    std::vector<ev_sockstats*> *m_stats_arr;
 
-    ev_app_srv_grp (json jcfg, std::vector<ev_sockstats*> *stats_arr)
-                                                : ev_app_conn_grp (jcfg)
+    ev_app_srv_grp (json jcfg, app_stats* parent_stats, app_stats* zone_stats)
+                        : ev_app_conn_grp (jcfg, parent_stats, zone_stats)
     {
         auto srv_ip = jcfg["srv_ip"].get<std::string>();
         u_short srv_port = jcfg["srv_port"].get<u_short>();
         ev_socket::set_sockaddr (&m_srvr_addr, srv_ip.c_str(), htons(srv_port));
-        m_stats_arr = stats_arr;
     }
 };
 
@@ -237,17 +240,14 @@ class ev_app_proxy_grp : public ev_app_conn_grp
 public:
 
     ev_sockaddr m_proxy_addr;
-    std::vector<ev_sockstats*> *m_stats_arr;
     int m_proxy_type;
 
-    ev_app_proxy_grp (json jcfg, std::vector<ev_sockstats*> *stats_arr)
-                                                : ev_app_conn_grp (jcfg)
+    ev_app_proxy_grp (json jcfg, app_stats* parent_stats, app_stats* zone_stats)
+                            : ev_app_conn_grp (jcfg, parent_stats, zone_stats)
     {
         auto proxy_ip = jcfg["proxy_ip"].get<std::string>();
         u_short proxy_port = jcfg["proxy_port"].get<u_short>();
         ev_socket::set_sockaddr (&m_proxy_addr, proxy_ip.c_str(), htons(proxy_port));
-
-        m_stats_arr = stats_arr;
 
         m_proxy_type = jcfg["proxy_type_id"].get<u_short>();
     }
@@ -276,7 +276,7 @@ public:
     }
 
     bool is_zero_conn_state(){
-        if (m_app_stats->tcpConnInitInUse == 0) {
+        if (m_app_stats.tcpConnInitInUse == 0) {
             return true;
         }
         return false;
@@ -290,7 +290,7 @@ public:
     app_stats* get_app_stats (const char* stats_label="")
     {
         if (strcmp(stats_label, "") == 0)
-            return m_app_stats;
+            return &m_app_stats;
 
         return m_stats_map[stats_label];
     };
@@ -317,7 +317,7 @@ public:
             } else if ((m_client_total_conn_count == 0) 
                         || (m_client_curr_conn_count < m_client_total_conn_count)) {
 
-                if ( (m_client_max_active_conn_count == 0) || (m_app_stats->tcpConnInitInUse < m_client_max_active_conn_count) )  {
+                if ( (m_client_max_active_conn_count == 0) || (m_app_stats.tcpConnInitInUse < m_client_max_active_conn_count) )  {
                     auto t = std::chrono::steady_clock::now();
                     auto span = std::chrono::duration_cast<std::chrono::nanoseconds>
                                                     (t - m_conn_init_time).count();
@@ -390,7 +390,7 @@ protected:
     uint64_t m_client_total_conn_count;
     uint32_t m_client_max_active_conn_count;
     uint32_t m_client_max_pending_conn_count;
-    app_stats* m_app_stats;
+    app_stats m_app_stats;
 };
 
 typedef app* (*app_maker_t) (json, ev_sockstats*);

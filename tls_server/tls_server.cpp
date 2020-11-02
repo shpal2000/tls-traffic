@@ -2,12 +2,9 @@
 
 
 tls_server_app::tls_server_app(json app_json
-                                // , tls_server_stats* zone_app_stats
-                                , ev_sockstats* zone_sock_stats)
+                                , app_stats* zone_app_stats)
 {
     server_config_init (app_json);
-
-    m_app_stats = new tls_server_stats();
 
     auto srv_list = app_json["srv_list"];
     for (auto it = srv_list.begin(); it != srv_list.end(); ++it)
@@ -21,20 +18,10 @@ tls_server_app::tls_server_app(json app_json
             continue;
         }
 
-        tls_server_stats* srv_stats = new tls_server_stats();
-        set_app_stats (srv_stats, srv_label.c_str());
+        tls_server_srv_grp* next_srv_grp = new tls_server_srv_grp (srv_cfg
+                                            , &m_app_stats, zone_app_stats);
 
-        std::vector<ev_sockstats*> *srv_stats_arr
-            = new std::vector<ev_sockstats*> ();
-
-        srv_stats_arr->push_back (srv_stats);
-        srv_stats_arr->push_back (m_app_stats);
-        // srv_stats_arr->push_back (zone_app_stats);
-        srv_stats_arr->push_back (zone_sock_stats);
-
-
-        tls_server_srv_grp* next_srv_grp
-            = new tls_server_srv_grp (srv_cfg, srv_stats_arr);
+        set_app_stats (next_srv_grp->get_stats(), srv_label.c_str());
 
         if (next_srv_grp->m_emulation_id == 0) {
             next_srv_grp->m_ssl_ctx = next_srv_grp->create_ssl_ctx ();
@@ -48,7 +35,7 @@ tls_server_app::tls_server_app(json app_json
         tls_server_socket* srv_socket 
             = (tls_server_socket*) new_tcp_listen (&srv_grp->m_srvr_addr
                                                     , 10000
-                                                    , srv_grp->m_stats_arr
+                                                    , &srv_grp->m_stats_arr
                                                     , &srv_grp->m_sock_opt);
         if (srv_socket) 
         {
@@ -72,7 +59,7 @@ void tls_server_app::run_iter(bool tick_sec)
 
     if (tick_sec)
     {
-        m_app_stats->tick_sec();
+        m_app_stats.tick_sec();
     }
 }
 
@@ -261,8 +248,8 @@ void tls_server_socket::on_finish ()
 }
 
 extern "C" {
-    app* tls_server (json app_json, ev_sockstats* zone_sock_stats) 
+    app* tls_server (json app_json, app_stats* zone_app_stats) 
     {
-        return new tls_server_app (app_json, zone_sock_stats);
+        return new tls_server_app (app_json, zone_app_stats);
     }
 }

@@ -11,9 +11,8 @@ class tls_server_srv_grp : public ev_app_srv_grp
 {
 public:
     tls_server_srv_grp (json jcfg
-                        , std::vector<ev_sockstats*> *stats_arr) 
-                    
-                    : ev_app_srv_grp (jcfg, stats_arr) 
+                        , app_stats* parent_stats, app_stats* zone_stats) 
+                        : ev_app_srv_grp (jcfg, parent_stats, zone_stats) 
     {
         m_cs_data_len = jcfg["cs_data_len"].get<int>();
         m_sc_data_len = jcfg["sc_data_len"].get<int>();
@@ -269,8 +268,7 @@ class tls_server_app : public app
 {
 public:
     tls_server_app(json app_json
-                    // , tls_server_stats* all_app_stats
-                    , ev_sockstats* all_ev_app_stats);
+                    , app_stats* zone_app_stats);
 
     ~tls_server_app();
 

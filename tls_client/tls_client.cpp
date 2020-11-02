@@ -40,12 +40,9 @@ static int parse_cb (SSL* s
 
 
 tls_client_app::tls_client_app(json app_json
-                    // , tls_client_stats* zone_app_stats
-                    , ev_sockstats* zone_sock_stats)
+                    , app_stats* zone_app_stats)
 {
     client_config_init (app_json);
-
-    m_app_stats = new tls_client_stats();
 
     auto cs_grp_list = app_json["cs_grp_list"];
     m_cs_group_count = 0;
@@ -62,19 +59,10 @@ tls_client_app::tls_client_app(json app_json
             continue;
         }
 
-        tls_client_stats* cs_grp_stats = new tls_client_stats();
-        set_app_stats (cs_grp_stats, cs_grp_label.c_str());
+        tls_client_cs_grp* next_cs_grp = new tls_client_cs_grp (cs_grp_cfg
+                                            , &m_app_stats, zone_app_stats);
 
-        std::vector<ev_sockstats*> *cs_grp_stats_arr 
-            = new std::vector<ev_sockstats*> ();
-
-        cs_grp_stats_arr->push_back (cs_grp_stats);
-        cs_grp_stats_arr->push_back (m_app_stats);
-        // cs_grp_stats_arr->push_back (zone_app_stats);
-        cs_grp_stats_arr->push_back (zone_sock_stats);
-
-        tls_client_cs_grp* next_cs_grp 
-            = new tls_client_cs_grp (cs_grp_cfg, cs_grp_stats_arr);
+        set_app_stats (next_cs_grp->get_stats(), cs_grp_label.c_str());
 
         next_cs_grp->m_ssl_ctx = SSL_CTX_new(TLS_client_method());
 
@@ -162,7 +150,7 @@ void tls_client_app::run_iter(bool tick_sec)
 
     if (tick_sec)
     {
-        m_app_stats->tick_sec();
+        m_app_stats.tick_sec();
     }
 
     for (int i=0; i < get_new_conn_count(); i++)
@@ -181,7 +169,7 @@ void tls_client_app::run_iter(bool tick_sec)
             tls_client_socket* client_socket = (tls_client_socket*) 
                                     new_tcp_connect (&client_addr->m_addr
                                                 , cs_grp->get_server_addr()
-                                                , cs_grp->m_stats_arr
+                                                , &cs_grp->m_stats_arr
                                                 , client_addr->m_portq
                                                 , &cs_grp->m_sock_opt);
             if (client_socket) 
@@ -423,8 +411,8 @@ void tls_client_socket::on_finish ()
 }
 
 extern "C" {
-    app* tls_client (json app_json, ev_sockstats* zone_sock_stats) 
+    app* tls_client (json app_json, app_stats* zone_app_stats) 
     {
-        return new tls_client_app (app_json, zone_sock_stats);
+        return new tls_client_app (app_json, zone_app_stats);
     }
 }
