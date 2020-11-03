@@ -13,6 +13,8 @@ subdir ('tls_server')
 subdir ('tls_client_perf')
 subdir ('tls_server_perf')
 
+subdir ('ocsp_server_perf')
+
 
 executable('tlspack.exe'
             , sources : [ 'main.cpp', 'app.cpp' ]
