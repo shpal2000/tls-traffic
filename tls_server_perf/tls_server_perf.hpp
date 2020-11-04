@@ -21,7 +21,8 @@ public:
         m_srv_cert = jcfg["srv_cert"].get<std::string>();
         m_srv_key = jcfg["srv_key"].get<std::string>();
         m_cipher = jcfg["cipher"].get<std::string>();
-        m_session_resumption = jcfg["session_resumption"].get<int>();
+        m_resumption_count = jcfg["resumption_count"].get<int>();
+        m_session_cache = jcfg["session_cache"].get<std::string>();
 
         auto tls_version 
             = jcfg["tls_version"].get<std::string>();
@@ -100,7 +101,8 @@ public:
     int m_read_buffer_len;
     int m_write_buffer_len;
 
-    int m_session_resumption;
+    int m_resumption_count;
+    std::string m_session_cache;
 
     std::string m_srv_cert;
     std::string m_srv_key;
@@ -157,9 +159,19 @@ public:
             SSL_CTX_set_mode(ssl_ctx, SSL_MODE_ENABLE_PARTIAL_WRITE);
 
 
-            if (m_session_resumption){
-                SSL_CTX_set_session_cache_mode(ssl_ctx
-                                                , SSL_SESS_CACHE_SERVER);
+            if (m_resumption_count){
+                if (strcmp(m_session_cache.c_str(), "server") == 0){
+                    SSL_CTX_set_session_cache_mode(ssl_ctx
+                                            , SSL_SESS_CACHE_SERVER);
+                } else if (strcmp(m_session_cache.c_str()
+                                                    , "client") == 0){
+                    SSL_CTX_set_session_cache_mode(ssl_ctx
+                                            , SSL_SESS_CACHE_CLIENT);
+                } else {
+                    SSL_CTX_set_session_cache_mode(ssl_ctx
+                                            , SSL_SESS_CACHE_SERVER);
+   
+                }
             } else {
                 SSL_CTX_set_session_cache_mode(ssl_ctx
                                                 , SSL_SESS_CACHE_OFF);

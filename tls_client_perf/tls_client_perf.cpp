@@ -71,9 +71,24 @@ tls_client_perf_app::tls_client_perf_app(json app_json
 
         SSL_CTX_set_mode(next_cs_grp->m_ssl_ctx, SSL_MODE_ENABLE_PARTIAL_WRITE);
 
-        SSL_CTX_set_session_cache_mode(next_cs_grp->m_ssl_ctx
-                                                , SSL_SESS_CACHE_OFF);
-        
+        if (next_cs_grp->m_resumption_count){
+            if (strcmp(next_cs_grp->m_session_cache.c_str()
+                                                    , "server") == 0){
+                SSL_CTX_set_session_cache_mode(next_cs_grp->m_ssl_ctx
+                                                    , SSL_SESS_CACHE_SERVER);
+            } else if (strcmp(next_cs_grp->m_session_cache.c_str()
+                                                        , "client") == 0){
+                SSL_CTX_set_session_cache_mode(next_cs_grp->m_ssl_ctx
+                                                    , SSL_SESS_CACHE_CLIENT);
+            } else {
+                SSL_CTX_set_session_cache_mode(next_cs_grp->m_ssl_ctx
+                                                    , SSL_SESS_CACHE_SERVER);
+            }
+        } else {
+            SSL_CTX_set_session_cache_mode(next_cs_grp->m_ssl_ctx
+                                            , SSL_SESS_CACHE_OFF);
+        }
+
         status = SSL_CTX_set1_groups_list(next_cs_grp->m_ssl_ctx
                                             , "P-521:P-384:P-256");
 
@@ -159,6 +174,17 @@ void tls_client_perf_socket::ssl_init ()
 {
     m_ssl = SSL_new (m_cs_grp->m_ssl_ctx);
     if (m_ssl){
+        if (m_cs_grp->m_sess_list.empty() == false) {
+            SSL_SESSION* session = m_cs_grp->m_sess_list.front();
+            m_cs_grp->m_sess_list.pop();
+            int ret = SSL_set_session (m_ssl, session);
+            inc_t_stats(sslResumptionInit);
+            m_old_sess = session;
+            if (ret == 0){
+                // todo
+            }
+        }
+
         SSL_set_tlsext_host_name (m_ssl, "www.google.com");
         set_as_ssl_client (m_ssl);
     } else {
@@ -306,6 +332,44 @@ void tls_client_perf_socket::on_rstatus (int bytes_read, int read_status)
 void tls_client_perf_socket::on_finish ()
 {
         if (m_ssl) {
+
+            if (m_cs_grp->m_resumption_count) {
+
+                int sess_reused = 0;
+                if (m_old_sess) {
+                    sess_reused = m_cs_grp->m_sess_cache[m_old_sess];
+                    m_cs_grp->m_sess_cache.erase(m_old_sess);
+                }
+
+                if (SSL_session_reused(m_ssl)) {
+                    // resumed session
+                    inc_t_stats(sslResumptionInitHit);
+                    sess_reused += 1;
+                    if (sess_reused == m_cs_grp->m_resumption_count) {
+                        // max resumption reached
+                        SSL_SESSION_free (m_old_sess);
+                        m_old_sess = nullptr;
+                    } else {
+                        // set for next resumption
+                        m_cs_grp->m_sess_list.push(m_old_sess);
+                        m_cs_grp->m_sess_cache.insert({m_old_sess
+                                                    , sess_reused});   
+                    }
+                } else {
+                    // set for first resumption
+                    SSL_SESSION* new_sess = SSL_get1_session(m_ssl);
+                    m_cs_grp->m_sess_list.push(new_sess);
+                    m_cs_grp->m_sess_cache.insert({new_sess, 0});
+
+                    if (m_old_sess) {
+                        // resumption attempted without success;
+                        inc_t_stats(sslResumptionInitMiss);
+                        SSL_SESSION_free (m_old_sess);
+                        m_old_sess = nullptr;
+                    }
+                }
+            }
+
             SSL_free (m_ssl);
             m_ssl = nullptr;
         }

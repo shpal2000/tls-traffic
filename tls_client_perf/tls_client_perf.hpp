@@ -19,6 +19,8 @@ public:
         m_cs_start_tls_len = jcfg["cs_start_tls_len"].get<int>();
         m_sc_start_tls_len = jcfg["sc_start_tls_len"].get<int>();
         m_cipher = jcfg["cipher"].get<std::string>();
+        m_resumption_count = jcfg["resumption_count"].get<int>();
+        m_session_cache = jcfg["session_cache"].get<std::string>();
 
         auto tls_version = jcfg["tls_version"].get<std::string>();
 
@@ -90,6 +92,12 @@ public:
     int m_read_buffer_len;
     int m_write_buffer_len;
 
+    int m_resumption_count;
+    std::string m_session_cache;
+
+    std::queue<SSL_SESSION*> m_sess_list;
+    std::unordered_map<SSL_SESSION*, int> m_sess_cache;
+
     std::string m_cipher;
     std::string m_cipher2;
     enum_close_type m_close;
@@ -128,6 +136,7 @@ public:
         m_bytes_read = 0;
         m_ssl = nullptr;
         m_ssl_init = false;
+        m_old_sess = nullptr;
     };
 
     virtual ~tls_client_perf_socket()
@@ -151,6 +160,7 @@ public:
     int m_bytes_written;
     int m_bytes_read;
     bool m_ssl_init;
+    SSL_SESSION* m_old_sess;
 };
 
 #endif
