@@ -397,12 +397,18 @@ typedef app* (*app_maker_t) (json, ev_sockstats*);
 
 #define inc_t_stats(__stat_name) \
 { \
-    inc_app_stats(this,app_stats,__stat_name); \
+    for (uint i=0; i < this->get_sockstats_arr()->size(); i++) { \
+        ev_sockstats* __stats_ptr = (*(this->get_sockstats_arr()))[i]; \
+        ((app_stats*)(__stats_ptr))->__stat_name++; \
+    } \
 }
 
 #define dec_t_stats(__stat_name) \
 { \
-    dec_app_stats(this,app_stats,__stat_name); \
+    for (uint i=0; i < this->get_sockstats_arr()->size(); i++) { \
+        ev_sockstats* __stats_ptr = (*(this->get_sockstats_arr()))[i]; \
+        ((app_stats*)(__stats_ptr))->__stat_name--; \
+    } \
 }
 
 #endif
