@@ -1,0 +1,46 @@
+{
+    "links": [],
+    "runing": "cps1",
+    "ready": 1,
+    "type": "TlsCsApp",
+    "ens161": {
+        "macvlan": "ens161macvlan"
+    },
+    "ens256": {
+        "macvlan": "ens256macvlan"
+    },
+    "traffic_paths": [
+        {
+            "client": {
+                "iface": "ens161",
+                "subnets": [
+                    "12.21.51.0/24"
+                ],
+                "gw_mac": "02:42:ac:14:00:01",
+                "client_list": [
+                    {
+                        "label": "client_group_1",
+                        "client_ip_begin": "12.21.51.1",
+                        "client_ip_count": 10,
+                        "server_ip": "14.21.51.1",
+                        "server_port": 443
+                    }
+                ]
+            },
+            "server": {
+                "iface": "ens256",
+                "subnets": [
+                    "14.21.51.0/24"
+                ],
+                "gw_mac": "02:42:ac:15:00:01",
+                "server_list": [
+                    {
+                        "label": "server_1",
+                        "server_ip": "14.21.51.1",
+                        "server_port": 443
+                    }
+                ]
+            }
+        }
+    ]
+}
