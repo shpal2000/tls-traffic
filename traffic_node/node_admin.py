@@ -21,11 +21,19 @@ async def start_run(request):
                         , data_j['app_config'])
     return web.json_response ({'status' : 0})
 
-async def stop_run(request):
-    data_s = await request.read()
-    data_j = json.loads(data_s)
-    TlsApp.stop_run (data_j['runid'])
+
+async def purge_testbed(request):
+    TlsApp.purge_testbed (request.query['testbed'])
     return web.json_response ({'status' : 0})
+
+
+async def stop_run(request):
+    TlsApp.stop_run (request.query['runid'])
+    return web.json_response ({'status' : 0})
+
+
+async def get_stats(request):
+    return web.json_response (TlsApp.get_stats (request.query['runid']))
 
 
 async def run_list(request):
@@ -33,7 +41,9 @@ async def run_list(request):
 
 
 app.add_routes([web.get('/run_list', run_list),
-                web.post('/stop_run', stop_run),
+                web.get('/get_stats', get_stats),
+                web.get('/stop_run', stop_run),
+                web.get('/purge_testbed', purge_testbed),
                 web.post('/start_run', start_run),
                 web.post('/get_config', get_config)])
 

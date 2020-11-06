@@ -86,7 +86,7 @@ def start_run_stats (runid
     if client_pod_ips:
         pod_ips += ' --client_pod_ips ' + ':'.join(client_pod_ips)
 
-    os.system('python3 -m tgen.TlsApp --runid {} {} & echo $! > {}'. \
+    os.system('python3 -m traffic_node.tgen.TlsApp --runid {} {} & echo $! > {}'. \
                                 format (runid, pod_ips, stats_pid_file))
 
     stats_pid = 0
@@ -407,6 +407,20 @@ class TlsApp(object):
                 stats = {}
             yield stats
 
+    @staticmethod
+    def get_stats(runid):
+        mongoClient = MongoClient (DB_CSTRING)
+
+        db = mongoClient[RESULT_DB_NAME]
+        stats_col = db[LIVE_STATS_TABLE]
+
+        try:
+            stats = stats_col.find({'runid' : runid}, {'_id': 0})[0]
+        except:
+            stats = {}
+
+        return stats
+        
 
     @staticmethod
     def purge_testbed (testbed):
@@ -648,7 +662,7 @@ class TlsCsApp(TlsApp):
         _testbedI.runid = ''
         _runI.dispose ()
 
-def get_stats (pod_ips):
+def get_pod_stats (pod_ips):
     stats_list = []
     stats_keys = []
     for pod_ip in pod_ips:
@@ -684,9 +698,9 @@ def collect_stats (runid
     while True:
         tick += 1
 
-        server_stats, server_stats_list  = get_stats (server_pod_ips)
-        proxy_stats, proxy_stats_list = get_stats (proxy_pod_ips)
-        client_stats, client_stats_list = get_stats (client_pod_ips)
+        server_stats, server_stats_list  = get_pod_stats (server_pod_ips)
+        proxy_stats, proxy_stats_list = get_pod_stats (proxy_pod_ips)
+        client_stats, client_stats_list = get_pod_stats (client_pod_ips)
         
         stats_col.insert({'tick' : tick
                                 , 'runid' : runid
