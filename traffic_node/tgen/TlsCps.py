@@ -9,7 +9,7 @@ import json
 
 class TlsCps(TlsCsApp):
 
-    def __init__(self):
+    def __init__(self, is_dev=False):
         super().__init__()
 
         self.client_module = 'libtls_client_perf.so'

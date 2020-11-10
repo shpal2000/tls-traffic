@@ -36,11 +36,9 @@ tar -xzvf tlsjet_certs.tar.gz
 rm tlsjet_certs.tar.gz
 
 cd $curdir
+chmod +x ./run.sh
+$curdir/run.sh $curdir
 
-printf "\n\nrun following command; to start admin"
-printf "\n**************************************************************\n"
-printf "\nchmod +x $curdir/run.sh"
-printf "\n$curdir/run.sh $curdir"
-printf "\n***************************************************************\n"
-
+printf "\n\nrun following command; to restart admin; if reboot vm\n\n"
+printf "$curdir/run.sh $curdir\n\n"
 

@@ -15,22 +15,43 @@ from threading import Thread
 from functools import reduce
 from pymongo import MongoClient
 
-from .config import NODE_RUNDIR, POD_RUNDIR, NODE_SRCDIR, POD_SRCDIR, TCPDUMP_FLAG
-from .config import DB_CSTRING, REGISTRY_DB_NAME, RESULT_DB_NAME, NODE_RUNDIR
+from .config import POD_RUNDIR, NODE_SRCDIR, POD_SRCDIR, TCPDUMP_FLAG
+from .config import REGISTRY_DB_NAME, RESULT_DB_NAME
 from .config import STATS_TABLE, CSTATE_TABLE, LIVE_STATS_TABLE, POD_RUNDIR
 from .config import RPC_IP_VETH1, RPC_IP_VETH2, RPC_PORT, NODE_SRCDIR, POD_SRCDIR
 from .config import TESTBED_TABLE, RUN_TABLE
 
+class TlsCfg:
+    DB_CSTRING = 'localhost:27017'
+    NODE_RUNDIR = '/root/rundir'
+
+
+def nodecmd(_cmd_str, check_ouput=False):
+    ssh_cmd = "ssh -i /ssh_rsa_id -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null localhost"
+    cmd_str = ssh_cmd + ' ' + '"{}"'.format (_cmd_str)
+    if check_ouput:
+        return subprocess.check_output(cmd_str, shell=True, close_fds=True).decode("utf-8").strip()
+    else:
+        os.system(cmd_str)
+        return None
+
+def localcmd(cmd_str, check_ouput=False):
+    if check_ouput:
+        return subprocess.check_output(cmd_str, shell=True, close_fds=True).decode("utf-8").strip()
+    else:
+        os.system(cmd_str)
+        return None
+
 def get_pod_name (testbed, pod_index):
-    return "{}-pod-{}".format (testbed, pod_index+1)
+    return "tlsjet_{}_pod_{}".format (testbed, pod_index+1)
 
 def get_exe_alias (testbed, pod_index, runid):
-    return "{}-{}.exe".format (get_pod_name (testbed, pod_index), runid)
+    return "{}_{}.exe".format (get_pod_name (testbed, pod_index), runid)
 
 def get_pod_ip (testbed, pod_index):
     pod_name = get_pod_name (testbed, pod_index)
     cmd_str = "docker inspect --format='{{.NetworkSettings.IPAddress}}' " + pod_name
-    return subprocess.check_output(cmd_str, shell=True, close_fds=True).decode("utf-8").strip()
+    return nodecmd(cmd_str, check_ouput=True)
 
 def start_run_thread(testbed
                         , pod_index
@@ -76,7 +97,7 @@ def start_run_stats (runid
                         , proxy_pod_ips=[]
                         , client_pod_ips=[]):
 
-    stats_pid_file = os.path.join(NODE_RUNDIR, 'traffic', runid, 'stats_pid.txt')
+    stats_pid_file = os.path.join(POD_RUNDIR, 'traffic', runid, 'stats_pid.txt')
 
     pod_ips = ''
     if server_pod_ips:
@@ -86,7 +107,7 @@ def start_run_stats (runid
     if client_pod_ips:
         pod_ips += ' --client_pod_ips ' + ':'.join(client_pod_ips)
 
-    os.system('python3 -m traffic_node.tgen.TlsApp --runid {} {} & echo $! > {}'. \
+    localcmd('python3 -m traffic_node.tgen.TlsApp --runid {} {} & echo $! > {}'. \
                                 format (runid, pod_ips, stats_pid_file))
 
     stats_pid = 0
@@ -104,7 +125,7 @@ def stop_run_stats(stats_pid):
             print (sys.exc_info())
 
 def run_stats_iter(runid):
-    mongoClient = MongoClient (DB_CSTRING)
+    mongoClient = MongoClient (TlsCfg.DB_CSTRING)
     db = mongoClient[RESULT_DB_NAME]
     stats_col = db[LIVE_STATS_TABLE]
     run_table = db[RUN_TABLE]
@@ -128,7 +149,7 @@ class TlsAppError (Exception):
         
 class TlsAppRun:
     def __init__(self, runid, new_run=True):
-        mongoClient = MongoClient (DB_CSTRING)
+        mongoClient = MongoClient (TlsCfg.DB_CSTRING)
         db = mongoClient[REGISTRY_DB_NAME]
         run_table = db[RUN_TABLE]
         if new_run:
@@ -142,35 +163,35 @@ class TlsAppRun:
 
     @property
     def testbed (self):
-        mongoClient = MongoClient (DB_CSTRING)
+        mongoClient = MongoClient (TlsCfg.DB_CSTRING)
         db = mongoClient[REGISTRY_DB_NAME]
         run_table = db[RUN_TABLE]
         return run_table.find_one ({'runid' : self.runid}).get('testbed', '')
 
     @testbed.setter
     def testbed (self, value):
-        mongoClient = MongoClient (DB_CSTRING)
+        mongoClient = MongoClient (TlsCfg.DB_CSTRING)
         db = mongoClient[REGISTRY_DB_NAME]
         run_table = db[RUN_TABLE]
         run_table.insert ({'runid' : self.runid, 'testbed' : value})
 
     @property
     def stats_pid(self):
-        mongoClient = MongoClient (DB_CSTRING)
+        mongoClient = MongoClient (TlsCfg.DB_CSTRING)
         db = mongoClient[REGISTRY_DB_NAME]
         run_table = db[RUN_TABLE]
         return run_table.find_one ({'runid' : self.runid}).get('stats_pid', '')
 
     @stats_pid.setter
     def stats_pid(self, value):
-        mongoClient = MongoClient (DB_CSTRING)
+        mongoClient = MongoClient (TlsCfg.DB_CSTRING)
         db = mongoClient[REGISTRY_DB_NAME]
         run_table = db[RUN_TABLE]
         run_table.update ({'runid' : self.runid}
                             , {"$set": { "stats_pid": value }})
 
     def dispose(self):
-        mongoClient = MongoClient (DB_CSTRING)
+        mongoClient = MongoClient (TlsCfg.DB_CSTRING)
         db = mongoClient[REGISTRY_DB_NAME]
         run_table = db[RUN_TABLE]
         run_table.remove ({'runid' : self.runid})
@@ -178,9 +199,10 @@ class TlsAppRun:
 
 
 class TlsAppTestbed:
-    def __init__(self, testbed):
+    def __init__(self, testbed, is_dev=False):
+        self.is_dev = is_dev
         self.testbed = testbed
-        mongoClient = MongoClient (DB_CSTRING)
+        mongoClient = MongoClient (TlsCfg.DB_CSTRING)
         db = mongoClient[REGISTRY_DB_NAME]
         testbed_table = db[TESTBED_TABLE]
         if not testbed_table.find_one({'testbed' : self.testbed}):
@@ -188,42 +210,42 @@ class TlsAppTestbed:
 
     @property
     def type(self):
-        mongoClient = MongoClient (DB_CSTRING)
+        mongoClient = MongoClient (TlsCfg.DB_CSTRING)
         db = mongoClient[REGISTRY_DB_NAME]
         testbed_table = db[TESTBED_TABLE]
         return testbed_table.find_one({'testbed' : self.testbed}).get('type', '')       
 
     @property
     def ready(self):
-        mongoClient = MongoClient (DB_CSTRING)
+        mongoClient = MongoClient (TlsCfg.DB_CSTRING)
         db = mongoClient[REGISTRY_DB_NAME]
         testbed_table = db[TESTBED_TABLE]
         return testbed_table.find_one({'testbed' : self.testbed}).get('ready', 0)
 
     @ready.setter
     def ready(self, value):
-        mongoClient = MongoClient (DB_CSTRING)
+        mongoClient = MongoClient (TlsCfg.DB_CSTRING)
         db = mongoClient[REGISTRY_DB_NAME]
         testbed_table = db[TESTBED_TABLE]
         testbed_table.update({'testbed' : self.testbed}, {"$set": { 'ready': value}})
     
     @property
     def runid(self):
-        mongoClient = MongoClient (DB_CSTRING)
+        mongoClient = MongoClient (TlsCfg.DB_CSTRING)
         db = mongoClient[REGISTRY_DB_NAME]
         testbed_table = db[TESTBED_TABLE]
         return testbed_table.find_one({'testbed' : self.testbed}).get('runing', '')
 
     @runid.setter
     def runid(self, value):
-        mongoClient = MongoClient (DB_CSTRING)
+        mongoClient = MongoClient (TlsCfg.DB_CSTRING)
         db = mongoClient[REGISTRY_DB_NAME]
         testbed_table = db[TESTBED_TABLE]
         testbed_table.update({'testbed' : self.testbed}, {"$set": { 'runing': value }})
 
     @property
     def busy(self):
-        mongoClient = MongoClient (DB_CSTRING)
+        mongoClient = MongoClient (TlsCfg.DB_CSTRING)
         db = mongoClient[REGISTRY_DB_NAME]
         testbed_table = db[TESTBED_TABLE]
         if testbed_table.find_one({'testbed' : self.testbed}).get('runing'):
@@ -231,16 +253,16 @@ class TlsAppTestbed:
         return False
 
     def get_info(self):
-        mongoClient = MongoClient (DB_CSTRING)
+        mongoClient = MongoClient (TlsCfg.DB_CSTRING)
         db = mongoClient[REGISTRY_DB_NAME]
         testbed_table = db[TESTBED_TABLE]
         return testbed_table.find_one({'testbed' : self.testbed})
 
 
 class TlsCsAppTestbed (TlsAppTestbed):
-    def __init__(self, testbed):
+    def __init__(self, testbed, is_dev=False):
 
-        super().__init__(testbed)
+        super().__init__(testbed, is_dev)
 
         testbed_info = self.get_info()
 
@@ -249,7 +271,7 @@ class TlsCsAppTestbed (TlsAppTestbed):
         self.traffic_path_count = len(self.traffic_paths)
         
     def start_pod(self, pod_index, testbed_info, traffic_path, client):
-        rundir_map = "--volume={}:{}".format (NODE_RUNDIR, POD_RUNDIR)
+        rundir_map = "--volume={}:{}".format (TlsCfg.NODE_RUNDIR, POD_RUNDIR)
         srcdir_map = "--volume={}:{}".format (NODE_SRCDIR, POD_SRCDIR)
 
         pod_name = get_pod_name (self.testbed, pod_index)
@@ -258,41 +280,43 @@ class TlsCsAppTestbed (TlsAppTestbed):
         else:
             node_iface = traffic_path['server']['iface']
 
-        cmd_str = "sudo docker run --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --network=bridge --privileged --name {} -it -d {} {} tlspack/tgen:latest /bin/bash".format (pod_name, rundir_map, srcdir_map)
-        os.system (cmd_str)
+        cmd_str = "sudo docker run --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --network=bridge --privileged --name {} -it -d {} {} tlsjet:latest /bin/bash".format (pod_name, rundir_map, srcdir_map)
+        nodecmd (cmd_str)
 
         pod_ip = get_pod_ip (self.testbed, pod_index)
 
         cmd_str = "sudo ip link set dev {} up".format(node_iface)
-        os.system (cmd_str)
+        nodecmd (cmd_str)
 
         node_macvlan = testbed_info[node_iface]['macvlan']
         cmd_str = "sudo docker network connect {} {}".format(node_macvlan, pod_name)
-        os.system (cmd_str)
+        nodecmd (cmd_str)
 
         cmd_str = "sudo docker exec -d {} echo '/rundir/cores/core.%t.%e.%p' | tee /proc/sys/kernel/core_pattern".format(pod_name)
-        os.system (cmd_str)
+        nodecmd (cmd_str)
+        
+        if self.is_dev:
 
-        cmd_str = "sudo docker exec -d {} cp -f /rundir/bin/librpc_server.so /usr/local/lib/".format(pod_name)
-        os.system (cmd_str)
+            cmd_str = "sudo docker exec -d {} cp -f /rundir/bin/librpc_server.so /usr/local/lib/".format(pod_name)
+            nodecmd (cmd_str)
 
-        cmd_str = "sudo docker exec -d {} cp -f /rundir/bin/libev_sock.so /usr/local/lib/".format(pod_name)
-        os.system (cmd_str)
+            cmd_str = "sudo docker exec -d {} cp -f /rundir/bin/libev_sock.so /usr/local/lib/".format(pod_name)
+            nodecmd (cmd_str)
 
-        cmd_str = "sudo docker exec -d {} cp -f /rundir/bin/tlspack.exe /usr/local/bin".format(pod_name)
-        os.system (cmd_str)
+            cmd_str = "sudo docker exec -d {} cp -f /rundir/bin/tlspack.exe /usr/local/bin".format(pod_name)
+            nodecmd (cmd_str)
 
-        cmd_str = "sudo docker exec -d {} chmod +x /usr/local/bin/tlspack.exe".format(pod_name)
-        os.system (cmd_str)
+            cmd_str = "sudo docker exec -d {} chmod +x /usr/local/bin/tlspack.exe".format(pod_name)
+            nodecmd (cmd_str)
 
-        cmd_str = "sudo docker exec -d {} cp -f /rundir/bin/rpc_proxy_main.py /usr/local/bin".format(pod_name)
-        os.system (cmd_str)
+            cmd_str = "sudo docker exec -d {} cp -f /rundir/bin/rpc_proxy_main.py /usr/local/bin".format(pod_name)
+            nodecmd (cmd_str)
 
-        cmd_str = "sudo docker exec -d {} chmod +x /usr/local/bin/rpc_proxy_main.py".format(pod_name)
-        os.system (cmd_str)
+            cmd_str = "sudo docker exec -d {} chmod +x /usr/local/bin/rpc_proxy_main.py".format(pod_name)
+            nodecmd (cmd_str)
 
         cmd_str = "sudo docker exec -d {} python3 /usr/local/bin/rpc_proxy_main.py {} {}".format(pod_name, pod_ip, RPC_PORT)
-        os.system (cmd_str)
+        nodecmd (cmd_str)
 
 
     def start(self):
@@ -315,7 +339,7 @@ class TlsCsAppTestbed (TlsAppTestbed):
     def stop_pod(self, pod_index):
         pod_name = get_pod_name (self.testbed, pod_index)
         cmd_str = "sudo docker rm -f {}".format (pod_name)
-        os.system (cmd_str)
+        nodecmd (cmd_str)
 
 
     def stop(self):
@@ -336,9 +360,15 @@ class TlsCsAppTestbed (TlsAppTestbed):
 
 
 class TlsApp(object):
-    def __init__(self):
+    def __init__(self, is_dev=False):
+        self.is_dev = is_dev
+
         self.pod_certs_dir = os.path.join(POD_RUNDIR, 'certs')
-        self.pod_lib_dir = os.path.join(POD_RUNDIR, 'bin')
+
+        if self.is_dev:
+            self.pod_lib_dir = os.path.join(POD_RUNDIR, 'bin')
+        else:
+            self.pod_lib_dir = os.path.join('/usr/local/lib')
 
         self.tcpdump = TCPDUMP_FLAG
         self.next_ipaddr = next_ipaddr
@@ -351,6 +381,36 @@ class TlsApp(object):
         self.testbedI = None
         self.app_testbed_type = None
 
+
+    @staticmethod
+    def restart(node_rundir):
+        TlsCfg.NODE_RUNDIR = node_rundir
+
+        nodecmd ("docker ps -a | grep '[t]lsjet_' | awk '{print $1}' | xargs docker rm -f")
+
+        # nodecmd ("ps aux | grep '[T]lsApp' | awk '{print $2}' | xargs kill -9")
+        # localcmd("mongod --shutdown --dbpath /rundir/db")
+        
+        localcmd("mongod --noauth --dbpath /rundir/db &")
+
+        time.sleep(1)
+
+        mongoClient = MongoClient (TlsCfg.DB_CSTRING)
+        db = mongoClient[REGISTRY_DB_NAME]
+
+        run_table = db[RUN_TABLE]
+        run_table.remove ({})
+
+        testbed_table = db[TESTBED_TABLE]
+        testbed_table.remove ({})
+
+        with open ('/rundir/arena-0.json') as f:
+            testbed0 = json.load(f)
+            testbed_table.insert (testbed0)
+
+
+
+
     @staticmethod
     def get_config(package, app_name, testbed, **app_kwargs):
         app_module = importlib.import_module ('.'+app_name, package=package)
@@ -360,18 +420,13 @@ class TlsApp(object):
         return config_j
 
     @staticmethod
-    def start_run (package, runid, config_j):
+    def start_run (package, runid, config_j, is_dev=False):
         app_name = config_j ['app']
         app_module = importlib.import_module ('.'+app_name, package=package)
         app_class = getattr(app_module, app_name)
-        app = app_class ()
+        app = app_class (is_dev)
         app.start_run (runid, config_j)
         return app
-
-    @staticmethod
-    def start (package, app_name, testbed, runid, **app_kwargs):
-        config_j = TlsApp.get_config (package, app_name, testbed, **app_kwargs)
-        return TlsApp.start_run (package, app_name, runid, config_j)
 
     @staticmethod
     def stop_run(runid):
@@ -392,7 +447,7 @@ class TlsApp(object):
 
     @staticmethod
     def stats_iter(runid):
-        mongoClient = MongoClient (DB_CSTRING)
+        mongoClient = MongoClient (TlsCfg.DB_CSTRING)
 
         db = mongoClient[RESULT_DB_NAME]
         stats_col = db[LIVE_STATS_TABLE]
@@ -409,7 +464,7 @@ class TlsApp(object):
 
     @staticmethod
     def get_stats(runid):
-        mongoClient = MongoClient (DB_CSTRING)
+        mongoClient = MongoClient (TlsCfg.DB_CSTRING)
 
         db = mongoClient[RESULT_DB_NAME]
         stats_col = db[LIVE_STATS_TABLE]
@@ -437,7 +492,7 @@ class TlsApp(object):
 
     @staticmethod
     def run_list ():
-        mongoClient = MongoClient (DB_CSTRING)
+        mongoClient = MongoClient (TlsCfg.DB_CSTRING)
         db = mongoClient[REGISTRY_DB_NAME]
         run_table = db[RUN_TABLE]
         running_app_list = run_table.find ({}, {'_id': 0})
@@ -451,7 +506,7 @@ class TlsApp(object):
         # testbed info
         testbed_class_name = self.app_testbed_type + 'Testbed'
         testbed_class = getattr(sys.modules[__name__], testbed_class_name)
-        _testbedI = testbed_class (testbed)
+        _testbedI = testbed_class (testbed, self.is_dev)
 
         # testbed compatibility
         if not _testbedI.type == self.app_testbed_type:
@@ -463,12 +518,12 @@ class TlsApp(object):
 
     def set_traffic_config (self, config_j):
 
-        node_cfg_dir = os.path.join(NODE_RUNDIR, 'traffic', self.runI.runid)
+        node_cfg_dir = os.path.join(POD_RUNDIR, 'traffic', self.runI.runid)
 
-        os.system ( 'rm -rf {}'.format(node_cfg_dir) )
-        os.system ( 'mkdir -p {}'.format(node_cfg_dir) )
-        os.system ( 'mkdir -p {}'.format(os.path.join(node_cfg_dir, 'pcaps')) )
-        os.system ( 'mkdir -p {}'.format(os.path.join(node_cfg_dir, 'logs')) )
+        localcmd( 'rm -rf {}'.format(node_cfg_dir) )
+        localcmd( 'mkdir -p {}'.format(node_cfg_dir) )
+        localcmd( 'mkdir -p {}'.format(os.path.join(node_cfg_dir, 'pcaps')) )
+        localcmd( 'mkdir -p {}'.format(os.path.join(node_cfg_dir, 'logs')) )
 
         node_cfg_file = os.path.join(node_cfg_dir, 'config.json')
         config_s = json.dumps(config_j, indent=2)
@@ -498,8 +553,8 @@ class TlsApp(object):
         self.testbedI = None
 
 class TlsCsApp(TlsApp):
-    def __init__ (self):
-        super().__init__()
+    def __init__ (self, is_dev=False):
+        super().__init__(is_dev)
         self.app_testbed_type = 'TlsCsApp'
 
     def start_run (self, runid, config_j):
@@ -688,7 +743,7 @@ def collect_stats (runid
                     , client_pod_ips):
     max_tick = 1
 
-    mongoClient = MongoClient (DB_CSTRING)
+    mongoClient = MongoClient (TlsCfg.DB_CSTRING)
     db = mongoClient[RESULT_DB_NAME]
     stats_col = db[LIVE_STATS_TABLE]
 

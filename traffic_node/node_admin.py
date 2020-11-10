@@ -1,5 +1,7 @@
 from aiohttp import web
 import json
+import os
+import sys
 
 from .tgen.TlsApp import TlsApp
 
@@ -47,5 +49,6 @@ app.add_routes([web.get('/run_list', run_list),
                 web.post('/start_run', start_run),
                 web.post('/get_config', get_config)])
 
-if __name__ == '__main__':  
+if __name__ == '__main__':
+    TlsApp.restart(sys.argv[1])
     web.run_app(app, port=8889)

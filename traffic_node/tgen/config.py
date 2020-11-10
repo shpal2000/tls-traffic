@@ -1,4 +1,3 @@
-DB_CSTRING = '10.115.78.80:27017'
 
 REGISTRY_DB_NAME = 'tgen_resgistry'
 
@@ -17,7 +16,6 @@ RPC_IP_VETH1 = '192.168.1.1'
 RPC_IP_VETH2 = '192.168.1.2'
 RPC_PORT = 8081
 
-NODE_RUNDIR = '/root/rundir'
 POD_RUNDIR = '/rundir'
 
 NODE_SRCDIR = '/root/srcdir'
