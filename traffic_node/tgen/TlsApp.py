@@ -50,7 +50,7 @@ def get_exe_alias (testbed, pod_index, runid):
 
 def get_pod_ip (testbed, pod_index):
     pod_name = get_pod_name (testbed, pod_index)
-    cmd_str = "docker inspect --format='{{.NetworkSettings.IPAddress}}' " + pod_name
+    cmd_str = "sudo docker inspect --format='{{.NetworkSettings.IPAddress}}' " + pod_name
     return nodecmd(cmd_str, check_ouput=True)
 
 def start_run_thread(testbed
@@ -386,7 +386,7 @@ class TlsApp(object):
     def restart(node_rundir):
         TlsCfg.NODE_RUNDIR = node_rundir
 
-        nodecmd ("docker ps -a | grep '[t]lsjet_' | awk '{print $1}' | xargs docker rm -f")
+        nodecmd ("sudo docker ps -a | grep '[t]lsjet_' | awk '{print $1}' | xargs sudo docker rm -f")
 
         # nodecmd ("ps aux | grep '[T]lsApp' | awk '{print $2}' | xargs kill -9")
         # localcmd("mongod --shutdown --dbpath /rundir/db")
