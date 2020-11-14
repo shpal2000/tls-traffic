@@ -27,7 +27,7 @@ class TlsCfg:
 
 
 def nodecmd(_cmd_str, check_ouput=False):
-    ssh_cmd = "ssh -i /ssh_rsa_id -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null localhost"
+    ssh_cmd = "ssh -i /rundir/ssh/ssh_rsa_id -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null localhost"
     cmd_str = ssh_cmd + ' ' + '"{}"'.format (_cmd_str)
     if check_ouput:
         return subprocess.check_output(cmd_str, shell=True, close_fds=True).decode("utf-8").strip()
@@ -45,9 +45,6 @@ def localcmd(cmd_str, check_ouput=False):
 def get_pod_name (testbed, pod_index):
     return "tlsjet_{}_pod_{}".format (testbed, pod_index+1)
 
-def get_exe_alias (testbed, pod_index, runid):
-    return "{}_{}.exe".format (get_pod_name (testbed, pod_index), runid)
-
 def get_pod_ip (testbed, pod_index):
     pod_name = get_pod_name (testbed, pod_index)
     cmd_str = "sudo docker inspect --format='{{.NetworkSettings.IPAddress}}' " + pod_name
@@ -57,8 +54,7 @@ def start_run_thread(testbed
                         , pod_index
                         , pod_cfg_file
                         , pod_iface_list
-                        , pod_ip
-                        , exe_alias):
+                        , pod_ip):
 
     url = 'http://{}:{}/start'.format(pod_ip, RPC_PORT)
 
@@ -67,8 +63,7 @@ def start_run_thread(testbed
                 , 'net_ifaces' : pod_iface_list
                 , 'rpc_ip_veth1' : RPC_IP_VETH1
                 , 'rpc_ip_veth2' : RPC_IP_VETH2
-                , 'rpc_port' : RPC_PORT
-                , 'exe_alias' : exe_alias}
+                , 'rpc_port' : RPC_PORT}
 
     resp = requests.post(url, json=data)
 
@@ -76,16 +71,14 @@ def start_run_thread(testbed
 def stop_run_thread(testbed
                         , pod_index
                         , pod_iface_list
-                        , pod_ip
-                        , exe_alias):
+                        , pod_ip):
 
     url = 'http://{}:{}/stop'.format(pod_ip, RPC_PORT)
 
     data = {'net_ifaces' : pod_iface_list
                 , 'rpc_ip_veth1' : RPC_IP_VETH1
                 , 'rpc_ip_veth2' : RPC_IP_VETH2
-                , 'rpc_port' : RPC_PORT
-                , 'exe_alias' : exe_alias}
+                , 'rpc_port' : RPC_PORT}
 
     resp = requests.post(url, data=json.dumps(data))
 
@@ -295,27 +288,7 @@ class TlsCsAppTestbed (TlsAppTestbed):
         cmd_str = "sudo docker exec -d {} echo '/rundir/cores/core.%t.%e.%p' | tee /proc/sys/kernel/core_pattern".format(pod_name)
         nodecmd (cmd_str)
         
-        if self.is_dev:
-
-            cmd_str = "sudo docker exec -d {} cp -f /rundir/bin/librpc_server.so /usr/local/lib/".format(pod_name)
-            nodecmd (cmd_str)
-
-            cmd_str = "sudo docker exec -d {} cp -f /rundir/bin/libev_sock.so /usr/local/lib/".format(pod_name)
-            nodecmd (cmd_str)
-
-            cmd_str = "sudo docker exec -d {} cp -f /rundir/bin/tlspack.exe /usr/local/bin".format(pod_name)
-            nodecmd (cmd_str)
-
-            cmd_str = "sudo docker exec -d {} chmod +x /usr/local/bin/tlspack.exe".format(pod_name)
-            nodecmd (cmd_str)
-
-            cmd_str = "sudo docker exec -d {} cp -f /rundir/bin/rpc_proxy_main.py /usr/local/bin".format(pod_name)
-            nodecmd (cmd_str)
-
-            cmd_str = "sudo docker exec -d {} chmod +x /usr/local/bin/rpc_proxy_main.py".format(pod_name)
-            nodecmd (cmd_str)
-
-        cmd_str = "sudo docker exec -d {} python3 /usr/local/bin/rpc_proxy_main.py {} {}".format(pod_name, pod_ip, RPC_PORT)
+        cmd_str = "sudo docker exec -d {} /rundir/bin/rpc_proxy_main.py {} {}".format(pod_name, pod_ip, RPC_PORT)
         nodecmd (cmd_str)
 
 
@@ -364,11 +337,7 @@ class TlsApp(object):
         self.is_dev = is_dev
 
         self.pod_certs_dir = os.path.join(POD_RUNDIR, 'certs')
-
-        if self.is_dev:
-            self.pod_lib_dir = os.path.join(POD_RUNDIR, 'bin')
-        else:
-            self.pod_lib_dir = os.path.join('/usr/local/lib')
+        self.pod_lib_dir = os.path.join(POD_RUNDIR, 'lib')
 
         self.tcpdump = TCPDUMP_FLAG
         self.next_ipaddr = next_ipaddr
@@ -404,7 +373,7 @@ class TlsApp(object):
         testbed_table = db[TESTBED_TABLE]
         testbed_table.remove ({})
 
-        with open ('/rundir/arena-0.json') as f:
+        with open ('/rundir/arenas/arena-0.json') as f:
             testbed0 = json.load(f)
             testbed_table.insert (testbed0)
 
@@ -588,17 +557,12 @@ class TlsCsApp(TlsApp):
             pod_ip = get_pod_ip (self.testbedI.testbed, pod_index)
             server_pod_ips.append (pod_ip)
 
-            exe_alias = get_exe_alias (self.testbedI.testbed
-                                        , pod_index
-                                        , self.runI.runid)
-
             thd = Thread(target=start_run_thread
                         , args=[self.testbedI.testbed
                                 , pod_index
                                 , pod_cfg_file
                                 , [self.testbedI.pod_iface]
-                                , pod_ip
-                                , exe_alias])
+                                , pod_ip])
             thd.daemon = True
             thd.start()
             pod_start_threads.append(thd)
@@ -620,17 +584,12 @@ class TlsCsApp(TlsApp):
             pod_ip = get_pod_ip (self.testbedI.testbed, pod_index)
             client_pod_ips.append (pod_ip)
 
-            exe_alias = get_exe_alias (self.testbedI.testbed
-                                        , pod_index
-                                        , self.runI.runid)
-
             thd = Thread(target=start_run_thread
                         , args=[self.testbedI.testbed
                                 , pod_index
                                 , pod_cfg_file
                                 , [self.testbedI.pod_iface]
-                                , pod_ip
-                                , exe_alias])
+                                , pod_ip])
             thd.daemon = True
             thd.start()
             pod_start_threads.append(thd)
@@ -663,16 +622,11 @@ class TlsCsApp(TlsApp):
 
             pod_ip = get_pod_ip (_testbedI.testbed, pod_index)
 
-            exe_alias = get_exe_alias (_testbedI.testbed
-                                        , pod_index
-                                        , _runI.runid)
-
             thd = Thread(target=stop_run_thread
                         , args=[_testbedI.testbed
                                 , pod_index
                                 , [_testbedI.pod_iface]
-                                , pod_ip
-                                , exe_alias])
+                                , pod_ip])
             thd.daemon = True
             thd.start()
             pod_stop_threads.append(thd)
@@ -691,16 +645,11 @@ class TlsCsApp(TlsApp):
 
             pod_ip = get_pod_ip (_testbedI.testbed, pod_index)
 
-            exe_alias = get_exe_alias (_testbedI.testbed
-                                        , pod_index
-                                        , _runI.runid)
-
             thd = Thread(target=stop_run_thread
                         , args=[_testbedI.testbed
                                 , pod_index
                                 , [_testbedI.pod_iface]
-                                , pod_ip
-                                , exe_alias])
+                                , pod_ip])
             thd.daemon = True
             thd.start()
             pod_stop_threads.append(thd)

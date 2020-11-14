@@ -8,7 +8,7 @@ rpc_serverlib = shared_library('rpc_server'
                                 , dependencies: [openssl, nlohmann_json_dep]
                                 , include_directories : [incdirs]
                                 , link_with : ev_socklib
-                                , install_rpath : '/usr/local/lib'
+                                , install_rpath : '/rundir/lib'
                                 , install_dir : '/srcdir/imgdir/'
                                 , install : true)
 

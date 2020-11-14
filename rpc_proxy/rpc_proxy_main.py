@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 from fastapi import FastAPI, BackgroundTasks
 from typing import Optional, List
 from pydantic import BaseModel
@@ -21,7 +23,6 @@ class StartParam(BaseModel):
     rpc_ip_veth1: str
     rpc_ip_veth2: str
     rpc_port: int
-    exe_alias: str
     timeout: Optional [int] = 15
 
 
@@ -30,19 +31,15 @@ class StopParam(BaseModel):
     rpc_ip_veth1: str
     rpc_ip_veth2: str
     rpc_port: int
-    exe_alias: str
     timeout: Optional [int] = 15
 
 
-async def collect_stats(ip: str, port: int, exe_alias: str):
+async def collect_stats(ip: str, port: int):
     global appStats
     while True:
 
         awk_exp = "'{print $2}'"
-        cmd_str = "kill -0 $(ps aux | grep '[{}]{}' | awk {})".format( \
-                                                                    exe_alias[0],
-                                                                    exe_alias[1:],
-                                                                    awk_exp)
+        cmd_str = "kill -0 $(ps aux | grep '[t]lspack.exe' | awk {})".format(awk_exp)
         status = os.system (cmd_str)
         if status: #not running
             break
@@ -68,13 +65,10 @@ async def collect_stats(ip: str, port: int, exe_alias: str):
 
 @app.post('/start')
 async def start(params : StartParam, background_tasks: BackgroundTasks):
-    # pdb.set_trace()
+    pdb.set_trace()
 
     awk_exp = "'{print $2}'"
-    cmd_str = "kill -0 $(ps aux | grep '[{}]{}' | awk {})".format( \
-                                                                params.exe_alias[0],
-                                                                params.exe_alias[1:],
-                                                                awk_exp)
+    cmd_str = "kill -0 $(ps aux | grep '[t]lspack.exe' | awk {})".format(awk_exp)
     status = os.system (cmd_str)
     if not status: #already running
         return {'status' : -2, 'error' : 'already running'}
@@ -110,15 +104,8 @@ async def start(params : StartParam, background_tasks: BackgroundTasks):
         for cmd in zone_cmds:
             cmd_str = "ip netns exec ns-tool {}".format(cmd)
             os.system (cmd_str)
-
-    cmd_str = "cp /usr/local/bin/tlspack.exe /usr/local/bin/{}".format(params.exe_alias)
-    os.system (cmd_str)
-
-    cmd_str = "chmod +x /usr/local/bin/{}".format(params.exe_alias)
-    os.system (cmd_str)
     
-    cmd_str = "ip netns exec {} {} {} {} {} {} &".format('ns-tool'
-            , params.exe_alias
+    cmd_str = "ip netns exec {} /rundir/bin/tlspack.exe {} {} {} {} &".format('ns-tool'
             , params.rpc_ip_veth2
             , params.rpc_port
             , params.cfg_file
@@ -154,8 +141,7 @@ async def start(params : StartParam, background_tasks: BackgroundTasks):
     if init_done:
         background_tasks.add_task(collect_stats
                                     , params.rpc_ip_veth2
-                                    , params.rpc_port
-                                    , params.exe_alias)
+                                    , params.rpc_port)
         return {"status" : 0}
 
     return {"status" : -1, 'error' : 'timeout'}
@@ -165,10 +151,7 @@ async def start(params : StartParam, background_tasks: BackgroundTasks):
 async def stop(params : StopParam):
     
     awk_exp = "'{print $2}'"
-    cmd_str = "kill -0 $(ps aux | grep '[{}]{}' | awk {})".format( \
-                                                                params.exe_alias[0],
-                                                                params.exe_alias[1:],
-                                                                awk_exp)
+    cmd_str = "kill -0 $(ps aux | grep '[t]lspack.exe' | awk {})".format(awk_exp)
     status = os.system (cmd_str)
 
     if status: # not running
@@ -201,10 +184,7 @@ async def stop(params : StopParam):
                 pass
 
     awk_exp = "'{print $2}'"
-    cmd_str = "kill $(ps aux | grep '[{}]{}' | awk {})".format( \
-                                                            params.exe_alias[0],
-                                                            params.exe_alias[1:],
-                                                            awk_exp)    
+    cmd_str = "kill $(ps aux | grep '[t]lspack.exe' | awk {})".format(awk_exp)    
     os.system (cmd_str)
 
     cmd_str = "ip netns exec ns-tool ip link set veth2 netns 1"

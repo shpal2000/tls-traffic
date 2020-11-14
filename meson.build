@@ -21,8 +21,8 @@ executable('tlspack.exe'
             , dependencies: [openssl, nlohmann_json_dep, libdl]
             , include_directories : [incdirs]
             , link_with : [ev_socklib, rpc_serverlib]
-            , build_rpath : '/usr/local/lib'
-            , install_rpath : '/usr/local/lib'
+            , build_rpath : '/rundir/lib'
+            , install_rpath : '/rundir/lib'
             , install_dir : '/srcdir/imgdir/'
             , install : true)
 
