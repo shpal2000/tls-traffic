@@ -34,7 +34,7 @@ class TlsCps(TlsCsApp):
         self.resumption_count = 10
         self.session_cache = "server"
 
-    def get_config (self
+    def create_config (self
                 , testbed
                 , cps
                 , cipher

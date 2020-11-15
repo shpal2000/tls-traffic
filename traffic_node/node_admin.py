@@ -7,10 +7,10 @@ from .tgen.TlsApp import TlsApp
 
 app = web.Application()
 
-async def get_config(request):
+async def create_config(request):
     data_s = await request.read()
     data_j = json.loads(data_s)
-    return web.json_response (TlsApp.get_config ('traffic_node.tgen'
+    return web.json_response (TlsApp.create_config ('traffic_node.tgen'
                                 , data_j['app_name']
                                 , data_j['testbed']
                                 , **data_j['app_params']))
@@ -25,17 +25,21 @@ async def start_run(request):
 
 
 async def purge_testbed(request):
-    TlsApp.purge_testbed (request.query['testbed'])
+    data_s = await request.read()
+    data_j = json.loads(data_s)
+    TlsApp.purge_testbed (data_j['testbed'])
     return web.json_response ({'status' : 0})
 
 
 async def stop_run(request):
-    TlsApp.stop_run (request.query['runid'])
+    data_s = await request.read()
+    data_j = json.loads(data_s)
+    TlsApp.stop_run (data_j['runid'])
     return web.json_response ({'status' : 0})
 
 
-async def get_stats(request):
-    return web.json_response (TlsApp.get_stats (request.query['runid']))
+async def run_stats(request):
+    return web.json_response (TlsApp.run_stats (request.query['runid']))
 
 
 async def run_list(request):
@@ -43,11 +47,11 @@ async def run_list(request):
 
 
 app.add_routes([web.get('/run_list', run_list),
-                web.get('/get_stats', get_stats),
-                web.get('/stop_run', stop_run),
-                web.get('/purge_testbed', purge_testbed),
+                web.get('/run_stats', run_stats),
+                web.post('/stop_run', stop_run),
+                web.post('/purge_testbed', purge_testbed),
                 web.post('/start_run', start_run),
-                web.post('/get_config', get_config)])
+                web.post('/create_config', create_config)])
 
 if __name__ == '__main__':
     TlsApp.restart(sys.argv[1])

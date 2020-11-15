@@ -9,7 +9,6 @@ import uvicorn
 import json
 import sys
 import os
-import pdb
 import time
 
 app = FastAPI()
@@ -65,8 +64,6 @@ async def collect_stats(ip: str, port: int):
 
 @app.post('/start')
 async def start(params : StartParam, background_tasks: BackgroundTasks):
-    pdb.set_trace()
-
     awk_exp = "'{print $2}'"
     cmd_str = "kill -0 $(ps aux | grep '[t]lspack.exe' | awk {})".format(awk_exp)
     status = os.system (cmd_str)

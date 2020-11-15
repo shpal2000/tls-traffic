@@ -381,11 +381,11 @@ class TlsApp(object):
 
 
     @staticmethod
-    def get_config(package, app_name, testbed, **app_kwargs):
+    def create_config(package, app_name, testbed, **app_kwargs):
         app_module = importlib.import_module ('.'+app_name, package=package)
         app_class = getattr(app_module, app_name)
         app = app_class ()
-        config_j = app.get_config (testbed, **app_kwargs)
+        config_j = app.create_config (testbed, **app_kwargs)
         return config_j
 
     @staticmethod
@@ -432,7 +432,7 @@ class TlsApp(object):
             yield stats
 
     @staticmethod
-    def get_stats(runid):
+    def run_stats(runid):
         mongoClient = MongoClient (TlsCfg.DB_CSTRING)
 
         db = mongoClient[RESULT_DB_NAME]
